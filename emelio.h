@@ -8,6 +8,7 @@
    ======================================================================== */
 
 #define CONTAINS(c,v) ((c).find(v) != (c).end())
+#define REFEQUAL(a,b) (&(a) == &(b))
 
 template<typename Char, typename Traits, typename Allocator>
 std::basic_string<Char, Traits, Allocator> operator *
