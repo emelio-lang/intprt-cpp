@@ -1,1 +1,1 @@
-(add (negate 5) (negate 5))
+((|x y| add x y) (negate 1) (negate 3))

@@ -8,11 +8,11 @@
 #include "emelio.h"
 
 typedef string Type;
-typedef string Token;
 
 struct Fn {
     pair<vector<Type>, vector<Type>> typ;
-    vector<Token> body;
+    Code body;
+    vector<Token> argnames = {};
 };
 
 struct Code {
@@ -25,41 +25,19 @@ struct Code {
 };
 
 Tokenizer tkn;
-Fn   __literal = Fn { {{},{}}, {"__literal"} }
-    ,__main = Fn { {{},{}}, {"__main"} };
+Fn   __literal = Fn { {{},{}}, {Token{"__literal"}} }
+    ,__main = Fn { {{},{}}, {Token{"__main"}} };
+unsigned long noname_counter = 0;
 map<string, Fn> bind = {
-    { "add",    Fn { {{"Int","Int"},{"Int"}}, {"--add"} } },
-    { "negate", Fn { {{"Int"},{"Int"}}, {"--negate"} } },
-    { "let",    Fn { {{"_Bind", "#Symbol"},{"()", "_Bind"}}, {"--let"} } },
+    { "add",    Fn { {{"Int","Int"},{"Int"}}, {Token{"--add"}} } },
+    { "negate", Fn { {{"Int"},{"Int"}}, {Token{"--negate"}} } },
+    { "let",    Fn { {{"_Bind", "#Symbol"},{"()", "_Bind"}}, {Token{"--let"}} } },
 };
 Code maincode = Code { __main, {} };
 
-// Code eval(Code code) {
-//     if (is_number(code.name)) return code;
-    
-//     if (!CONTAINS(bind, code.name)) {
-//         cout << "[Error] undefinied function \"" << code.name << "\"" << endl;
-//         return Code { "error", {} };
-//     }
-
-//     if (code.name == "add") {
-//         // ここで評価
-//         int a1 = eval_as_int(code.args[0]);
-//         int a2 = eval_as_int(code.args[1]);
-
-//         return Code { to_string(a1 + a2), {} };
-//     } else if (code.name == "negate") {
-//         int a1 = eval_as_int(code.args[0]);
-        
-//         return Code { to_string(-a1), {} };
-//     } else if (code.name == "let") {
-        
-//     }
-// }
-
 void showCode(Code& code, int lvl = 0) {
     cout << string("  ") * lvl << "Code: ";
-    for (Token t : code.fn.body) cout << t;
+    for (Token t : code.fn.body) cout << t.val;
     cout << endl;
     for (Code arg : code.args) showCode(arg, lvl+1);
 }
@@ -89,6 +67,111 @@ int lit_int(Code code) {
 }
 
 
+Code parse_code(vector<Token>& tkns) {
+    stack<Code*> codest = {};
+    Code res = /*{fn args cal}*/ Code {bind[tkn.tokenvals[0]], {}};
+    codest.push(&res);
+    int mode = 0; /*
+                    0 -- initial
+                    1 -- new function
+                    2 -- new argument
+                  */
+    mode = 2;
+    
+    for (int i = 2; i < tkn.tokenvals.size(); ++i) {
+        switch (mode) {
+            case 1:
+                if (tkn.tokenvals[i] == ")") continue;
+
+                // here, it is a function or a name of function
+
+                Fn& parsed = parse_fn(i);
+                codest.top()->args.push_back(Code {parsed, {}});
+                codest.push(&(*--codest.top()->args.end()));
+                mode = 2;
+                break;
+             
+            case 2:
+                if (tkn.tokenvals[i] == "(") {
+                    mode = 1;
+                } else if (tkn.tokenvals[i] == ")") {
+                    codest.pop();
+                } else {
+                    codest.top()->args.push_back(lit_code(tkn.tokens[i]));
+                }
+                break;
+        }
+    }
+
+    return res;
+}
+
+
+Fn& refer_fn(string name) {
+    // refer to bind table and store function's reference
+    if (!CONTAINS(bind, name)) {
+        cout << "[Error] undefinied function \"" << tkn.tokenval[i] << "\""
+             << " (" << tkn.token[i].line << ":" << tkn.token[i].col << ")" << endl;
+        return;
+    }
+
+    return bind[name];
+}
+
+
+Fn& parse_fn(int &idx) {
+    Fn res = Fn { {{}, {}}, {} };
+    // 名前だけのときもある
+    if (tkn.tokenvals[idx] == '(') {
+        idx++;
+        int mode = 0; /*
+                        1 -- args
+                        
+                       */
+        
+        if (tkn.tokenvals[idx] == '|') {
+            idx++;
+            for (; idx < tkn.tokenvals.size(); idx++) {
+                if (tkn.tokenvals[idx] == '|')
+                    goto success1;
+
+                res.argnames.push_back(tkn.token[idx]);
+            }
+
+            cout << "[Error] No corresponding |" << endl;
+success1:
+        }
+
+        // TODO: subvectorをもう一度構築しているので
+        // メモリ的により効率的な方法がありますか？
+        vector<Token> fn_body_tkns = {};
+        
+        for (; idx < tkn.tokenvals.size(); idx++) {
+            if (tkn.token[idx] == ')') {
+                res.body = parse_code(fn_body_tkns);
+                goto success2;
+            }
+
+            fn_body_tkns.push_back(tkn.token[idx]);
+        }
+        
+        cout << "[Error] No corresponding (" << endl;
+        
+success2:
+        bind.push_back(make_pair("__noname" + noname_counter, res));
+
+        return bind["__noname" + noname_counter];
+    } else {
+        // TODO: 名前参照
+        return refer_fn(tkn.tokenvals[idx]);
+    }
+}
+
+int exec_code(Code& code) {
+    
+}
+
+
 void exec() {
     stack<Code*> codest = {};
     int mode = 0; /*
@@ -96,35 +179,27 @@ void exec() {
                     1 -- new function
                     2 -- new argument
                   */
-    maincode.args.push_back(Code {bind[tkn.tokens[1]], {}});
+    maincode.args.push_back(Code {bind[tkn.tokenvals[1]], {}});
     codest.push(&(*--maincode.args.end()));
     mode = 2;
     
-    for (int i = 2; i < tkn.tokens.size(); ++i) {
+    for (int i = 2; i < tkn.tokenvals.size(); ++i) {
         switch (mode) {
             case 1:
-                if (tkn.tokens[i] == ")") continue;
+                if (tkn.tokenvals[i] == ")") continue;
 
                 // here, it is a function or a name of function
-                if (tkn.tokens[i] == "(") {
-                    // idk functions!
-                } else {
-                    // refer to bind table and store function's reference
-                    if (!CONTAINS(bind, tkn.tokens[i])) {
-                        cout << "[Error] undefinied function \"" << tkn.tokens[i] << "\"" << endl;
-                        return;
-                    }
 
-                    codest.top()->args.push_back(Code {bind[tkn.tokens[i]], {}});
-                    codest.push(&(*--codest.top()->args.end()));
-                    mode = 2;
-                }
+                Fn& parsed = parse_fn(i);
+                codest.top()->args.push_back(Code {parsed, {}});
+                codest.push(&(*--codest.top()->args.end()));
+                mode = 2;
             break;
              
             case 2:
-                if (tkn.tokens[i] == "(") {
+                if (tkn.tokenvals[i] == "(") {
                     mode = 1;
-                } else if (tkn.tokens[i] == ")") {
+                } else if (tkn.tokenvals[i] == ")") {
                     Code* t = codest.top();
 
                     // TODO: 関数だけの型チェックとかはできんの？
@@ -140,6 +215,11 @@ void exec() {
 
                         t->cal = to_string(a1 + a2);
                     }
+                    else {
+                        for (string argname : t->fn.argnames) {
+                            
+                        }
+                    }
                     codest.pop();
                 } else {
                     codest.top()->args.push_back(lit_code(tkn.tokens[i]));
@@ -154,7 +234,7 @@ int main() {
     tkn.preset("cpp");
     tkn.tokenize_file("test.em");
 
-    showv(tkn.tokens);
+    showv(tkn.tokenvals);
 
     exec();
 
