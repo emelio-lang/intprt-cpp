@@ -9,29 +9,44 @@
 
 typedef string Type;
 
+/*
+NOTE: 束縛情報はグローバル変数bindがずっと管理してて、それが増えたり減ったりする (TODOほんとにそれで良い？)
+TODO(明日): Nullable referenceをCodeに追加して型的なミスマッチを解消する
+ */
+
+struct Fn;
+struct Code;
+
+struct Code {
+    Fn fn;
+    vector<Code> args;
+
+    // 試験的に計算結果をここに入れるようにしてみる
+    // リテラルもここに保存。リテラルの時はfn = __literal
+    string cal = "";
+
+    // 追加の束縛(このコード以下は
+};
+
 struct Fn {
     pair<vector<Type>, vector<Type>> typ;
     Code body;
     vector<Token> argnames = {};
 };
 
-struct Code {
-    Fn& fn;
-    vector<Code> args;
-
-    // 試験的に計算結果をここに入れるようにしてみる
-    // リテラルもここに保存。リテラルの時はfn = __literal
-    string cal = "";
-};
-
 Tokenizer tkn;
-Fn   __literal = Fn { {{},{}}, {Token{"__literal"}} }
-    ,__main = Fn { {{},{}}, {Token{"__main"}} };
+Fn   __literal = Fn { {{},{}}, {Token{"__literal",0,0}} } //リテラル用
+,__main = Fn { {{},{}}, {Token{"__main"}} } //
+,__blank = Fn { {{},{}}, {Token{"__blank"}} } 
+;
 unsigned long noname_counter = 0;
 map<string, Fn> bind = {
     { "add",    Fn { {{"Int","Int"},{"Int"}}, {Token{"--add"}} } },
     { "negate", Fn { {{"Int"},{"Int"}}, {Token{"--negate"}} } },
     { "let",    Fn { {{"_Bind", "#Symbol"},{"()", "_Bind"}}, {Token{"--let"}} } },
+};
+// TODO: 一時用のリテラル用束縛情報, Fnとうまく扱う方法を考えてbindと統合して欲しい
+map<string, Code&> litbind = {
 };
 Code maincode = Code { __main, {} };
 
@@ -67,6 +82,18 @@ int lit_int(Code code) {
 }
 
 
+
+Fn& refer_fn(string name) {
+    // refer to bind table and store function's reference
+    if (!CONTAINS(bind, name)) {
+        cout << "[Error] undefinied function \"" << tkn.tokenval[i] << "\""
+             << " (" << tkn.token[i].line << ":" << tkn.token[i].col << ")" << endl;
+        return;
+    }
+
+    return bind[name];
+}
+
 Code parse_code(vector<Token>& tkns) {
     stack<Code*> codest = {};
     Code res = /*{fn args cal}*/ Code {bind[tkn.tokenvals[0]], {}};
@@ -97,25 +124,18 @@ Code parse_code(vector<Token>& tkns) {
                 } else if (tkn.tokenvals[i] == ")") {
                     codest.pop();
                 } else {
-                    codest.top()->args.push_back(lit_code(tkn.tokens[i]));
+                    if (is_number(tkn.tokens[i])) {
+                        codest.top()->args.push_back(lit_code(tkn.tokens[i]));
+                    } else {
+                        // 関数を表しているときもある
+                        codest.top()->args.push_back(Code {__blank, {}, tkn.tokens[i]});
+                    }
                 }
                 break;
         }
     }
 
     return res;
-}
-
-
-Fn& refer_fn(string name) {
-    // refer to bind table and store function's reference
-    if (!CONTAINS(bind, name)) {
-        cout << "[Error] undefinied function \"" << tkn.tokenval[i] << "\""
-             << " (" << tkn.token[i].line << ":" << tkn.token[i].col << ")" << endl;
-        return;
-    }
-
-    return bind[name];
 }
 
 
@@ -167,8 +187,50 @@ success2:
     }
 }
 
-int exec_code(Code& code) {
-    
+Code exec_code(Code code) {
+    // 変数なら、今は計算済みなはず(TODOﾎﾝﾄ？関数を含んでいる変数は？)なので解決して返す
+    if (REFEQUAL(code.fn, __blank))
+        return lit_code(litbind[code.cal]);
+                                            
+    // 計算済みなら計算することはない
+    if (code.cal != "") return code;
+
+
+    if (REFEQUAL(code.fn, bind["negate"])) {
+        int a1 = lit_int(code.args[0]);
+        
+        code.cal = to_string(-a1);
+    }
+    else if (REFEQUAL(code.fn, bind["add"])) {
+        int a1 = lit_int(code.args[0]);
+        int a2 = lit_int(code.args[1]);
+
+        code.cal = to_string(a1 + a2);
+    }
+    else {
+        /* 個別定義された関数の場合
+           
+           引数は計算されているはず（TODOそうでもない場合も扱えるように！）
+           なので、関数のbodyで引数を全て置き換えたCodeを新たに作ってそれを実行した結果を返す。
+         */
+
+        Code applied = code.fn.body;
+        map<string, Code&> tmp_litbind = litbind;
+
+        for (int i = 0;
+             i < code.fn.argnames;
+             i++)
+        {
+            
+            litbind[code.fn.argnames[i]] = code.args[i];
+        }
+
+        code = exec_code(applied);
+
+        litbind = tmp_litbind;
+    }
+
+    return code;
 }
 
 
@@ -236,7 +298,8 @@ int main() {
 
     showv(tkn.tokenvals);
 
-    exec();
+    parse_code(tkn);
+    exec_code(tkn);
 
     showProgram();
 
