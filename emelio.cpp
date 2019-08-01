@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <stack>
 
@@ -6,6 +7,8 @@
 #include "Tokenizer/tokenizer.h"
 
 #include "emelio.h"
+
+#define NULL_FN ("__null")
 
 typedef string Type;
 
@@ -18,7 +21,9 @@ struct Fn;
 struct Code;
 
 struct Code {
-    Fn *fn;
+    // NOTE: mapは再配置があるらしいので、そのバグかもしれない。
+    // とりあえずキーを保存するように変えてみる
+    string fnname;
     vector<Code> args;
 
     // 試験的に計算結果をここに入れるようにしてみる
@@ -26,6 +31,8 @@ struct Code {
     string cal = "";
 
     // 追加の束縛(このコード以下は
+
+    Fn* fn();
 };
 
 struct Fn {
@@ -39,9 +46,9 @@ Tokenizer tkn;
 /* ; */
 unsigned long noname_counter = 0;
 map<string, Fn> bind = {
-    { "add",    Fn { {{"Int","Int"},{"Int"}}, Code {0, {}, "__+"} }},
-    { "negate", Fn { {{"Int"},{"Int"}}, Code {0, {}, "__-"}}},
-    { "let",    Fn { {{"_Bind", "#Symbol"},{"()", "_Bind"}}, Code {0, {}, "__let"}} },
+    { "add",    Fn { {{"Int","Int"},{"Int"}}, Code {NULL_FN, {}, "__+"} }},
+    { "negate", Fn { {{"Int"},{"Int"}}, Code {NULL_FN, {}, "__-"}}},
+    { "let",    Fn { {{"_Bind", "#Symbol"},{"()", "_Bind"}}, Code {NULL_FN, {}, "__let"}} },
 };
 
 /*********************/
@@ -49,24 +56,27 @@ map<string, Fn> bind = {
 /*********************/
 Code lit_code(string l);
 int lit_int(Code code);
-Fn *refer_fn(string name);
+//Fn *refer_fn(string name);
 Code parse_code(vector<Token>& tkns);
-Fn *parse_fn(vector<Token>& tkns, int &idx);
-int exec_code(Code&, int dbg = 0);
+string parse_fn(vector<Token>& tkns, int &idx);
+// Code exec_code(Code, int dbg = 0);
+void test();
+
+Fn* Code::fn() { return &bind[this->fnname]; }
 
 void showCode(Code& code, int lvl=0)
 {
-    if (code.fn) {
+    if (code.fnname == NULL_FN) {
+        cout << code.cal;
+    } else {
         cout << string("  ") * lvl;
-        if (code.fn->argnames.size() != 0) {
+        if (code.fn()->argnames.size() != 0) {
             cout << "\\";
-            for (auto argname : code.fn->argnames) {
+            for (auto argname : code.fn()->argnames) {
                 cout << argname.val << " ";
             }
         }
-        showCode(code.fn->body, lvl);
-    } else {
-        cout << code.cal;
+        showCode(code.fn()->body, lvl);
     }
 //    cout << endl;
 
@@ -83,31 +93,7 @@ void showCode(Code& code, int lvl=0)
 
 Code lit_code(string l)
 {
-    return Code {0, {}, l};
-}
-
-int lit_int(Code code)
-{
-    // ここで計算されてなくても、次のexec_codeで計算されるので大丈夫？
-    // if (code.cal == "") {
-    //     cout << "Something wrong happened." << endl;
-    //     cout << "Code hasn't been calculated: " << endl;
-    //     showCode(code);
-    //     cout << endl;
-    // }
-
-    
-    // TODO: 試験的にここで変数を展開
-    exec_code(code);
-
-    // type check function for Int
-    if (!is_number(code.cal)) {
-        cout << "[ERR] Expected Int, not '" << code.cal << "'"<< endl;
-        showCode(code);
-        cout << endl;
-    }
-
-    return stoi(code.cal);
+    return Code {NULL_FN, {}, l};
 }
 
 
@@ -147,7 +133,7 @@ Code parse_code(vector<Token>& tkns)
 
                 // here, it is a function or a name of function
 
-                Fn* parsed = parse_fn(tkns, idx);
+                string parsed = parse_fn(tkns, idx);
                 codest.top()->args.push_back(Code {parsed, {}});
                 codest.push(&(*--codest.top()->args.end()));
                 mode = 2;
@@ -171,7 +157,7 @@ Code parse_code(vector<Token>& tkns)
 
 
 /* NOTE: 関数の最後のトークンまでidxを移動させて返却します（一個次のトークンまでではないです） */
-Fn *parse_fn(vector<Token>& tkns, int &idx)
+string parse_fn(vector<Token>& tkns, int &idx)
 {
     Fn res = Fn { {{}, {}}, {} };
     // 名前だけのときもある
@@ -223,49 +209,55 @@ success2:
         noname_counter++;
         bind.insert(make_pair("__noname" + to_string(noname_counter), res));
 
-        return &bind["__noname" + to_string(noname_counter)];
-    } else {
-        // TODO: 名前参照
-        Fn* refn = refer_fn(tkns[idx].val);
-        if (!refn) {
-            cout << "[Error] undefinied function \"" << tkns[idx].val << "\""
-                 << " (" << tkns[idx].line << ":" << tkns[idx].col << ")" << endl;
-            return 0;
-        }
-        return refn;
+        return "__noname" + to_string(noname_counter);
+    }
+    else {
+        // // TODO: 名前参照
+        // Fn* refn = refer_fn(tkns[idx].val);
+        // if (!refn) {
+        //     cout << "[Error] undefinied function \"" << tkns[idx].val << "\""
+        //          << " (" << tkns[idx].line << ":" << tkns[idx].col << ")" << endl;
+        //     return 0;
+        // }
+        // return refn;
+        return tkns[idx].val;
     }
 }
 
-int exec_code(Code &code, int dbg)
+Code exec_code(Code code, int dbg = 0, bool trace = false)
 {
-    cout << string(" ") * dbg << "Calculating... ";
-    showCode(code);
-    cout << endl;
+    if (trace) {
+        cout << string(" ") * dbg << "Calculating... ";
+        showCode(code);
+        cout << endl;
+    }
     
     // 変数なら、今は計算済みなはず(TODOﾎﾝﾄ？関数を含んでいる変数は？)なので解決して返す
     // リテラルなら何もしない
-    if (!code.fn) {
+    if (code.fnname == NULL_FN) {
         if (!is_number(code.cal)) {
-            if (!bind[code.cal].body.fn) {
+            if (bind[code.cal].body.fnname == NULL_FN) {
                 code.cal = bind[code.cal].body.cal;
             } else {
                 code = bind[code.cal].body; // TODO: 試験的
             }
         }
 
-        cout << string(" ") * dbg << "done.";
-        showCode(code);
-        cout << endl;
+        if (trace) {
+            cout << string(" ") * dbg << "done.";
+            showCode(code);
+            cout << endl;
+        }
 
-        return 1;
+        return code;
     }
                                             
-    if (code.fn == &bind["negate"]) {
+    if (code.fnname == "negate") {
         int a1 = lit_int(code.args[0]);
         
         code.cal = to_string(-a1);
     }
-    else if (code.fn == &bind["add"]) {
+    else if (code.fnname == "add") {
         int a1 = lit_int(code.args[0]);
         int a2 = lit_int(code.args[1]);
 
@@ -278,33 +270,54 @@ int exec_code(Code &code, int dbg)
            なので、関数のbodyで引数を全て置き換えたCodeを新たに作ってそれを実行した結果を返す。
          */
 
-        Code applied = code.fn->body;
+        Code applied = code.fn()->body;
         map<string, Fn> tmp_bind = bind;
 
         for (int i = 0;
-             i < code.fn->argnames.size();
+             i < code.fn()->argnames.size();
              i++)
         {
-            cout << "Argument " << i << endl;
-            exec_code(code.args[i], dbg+1);
+            code.args[i] = exec_code(code.args[i], dbg+1);
             
-            bind[code.fn->argnames[i].val] = Fn {
+            bind[code.fn()->argnames[i].val] = Fn {
                 /*TODO:試験的*/{{},{"Int"}}, /*typ*/
                 lit_code(code.args[i].cal), /*code*/
                 {} /*argnames*/
             };
         }
 
-        exec_code(applied, dbg+1);
-        code = applied;
+        code = exec_code(applied, dbg+1);
 
         bind = tmp_bind;
     }
 
-    cout << string(" ") * dbg << "done.";
-    showCode(code);
-    cout << endl;
-    return 1;
+    if (trace)
+        cout << string(" ") * dbg << "done. " << code.cal << endl;
+    return code;
+}
+
+int lit_int(Code code)
+{
+    // ここで計算されてなくても、次のexec_codeで計算されるので大丈夫？
+    // if (code.cal == "") {
+    //     cout << "Something wrong happened." << endl;
+    //     cout << "Code hasn't been calculated: " << endl;
+    //     showCode(code);
+    //     cout << endl;
+    // }
+
+    
+    // TODO: 試験的にここで変数を展開
+    code = exec_code(code);
+
+    // type check function for Int
+    if (!is_number(code.cal)) {
+        cout << "[ERR] Expected Int, not '" << code.cal << "'"<< endl;
+        showCode(code);
+        cout << endl;
+    }
+
+    return stoi(code.cal);
 }
 
 
@@ -319,11 +332,34 @@ int main() {
 
     showCode(maincode);
 
-    exec_code(maincode);
+    maincode = exec_code(maincode);
 
     cout << endl << endl;
 
     cout << maincode.cal << endl;
 
+    test();
+
     return 0;
+}
+
+void test() {
+    ifstream ifs("testcases.em");
+
+    string cd, ans;
+
+    while (true) {
+        if (!getline(ifs, cd)) break;
+        if (!getline(ifs, ans)) break;
+        
+        cout << "Testing " << cd << " --- ";
+
+        tkn.tokenize(cd);
+        string res = exec_code(parse_code(tkn.tokens)).cal;
+        if (res == ans) {
+            cout << "\033[1;32mPassed.\033[0m" << endl;
+        } else {
+            cout << "\033[1;31mError!\033[0m " << endl << "Expected '" << ans << "', but '" << res << "'." << endl;
+        }
+    }
 }
