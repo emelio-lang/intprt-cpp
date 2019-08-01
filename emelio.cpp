@@ -14,7 +14,20 @@ typedef string Type;
 
 /*
 NOTE: 束縛情報はグローバル変数bindがずっと管理してて、それが増えたり減ったりする (TODOほんとにそれで良い？)
+
 TODO(明日): Nullable referenceをCodeに追加して型的なミスマッチを解消する
+
+NOTE: 少し細かい関数の表記の定義
+関数は、変数参照(TODOこんなふうに言うのも変だしref関数を考えるのもあり)はそのシンボルのトークンのみ、
+　　　　即時関数は'('から始まり、対応する')'までを言う。
+コード（式）とは、"関数 引数..."とか"リテラル"とかプログラムとして受け取れるの形をしているものを言う(TODOは？)。
+example)
+(3)       関数（即時関数）
+3         式
+add 2 3   式
+add       関数
+(add 2 3) 式, 関数
+
  */
 
 struct Fn;
@@ -60,7 +73,7 @@ int lit_int(Code code);
 Code parse_code(vector<Token>& tkns);
 string parse_fn(vector<Token>& tkns, int &idx);
 // Code exec_code(Code, int dbg = 0);
-void test();
+void test(bool verbose = false);
 
 Fn* Code::fn() { return &bind[this->fnname]; }
 
@@ -129,7 +142,7 @@ Code parse_code(vector<Token>& tkns)
     for (idx++; idx < tkns.size(); ++idx) {
         switch (mode) {
             case 1: {
-                if (tkns[idx].val == ")") continue;
+                // if (tkns[idx].val == ")") continue;
 
                 // here, it is a function or a name of function
 
@@ -137,11 +150,13 @@ Code parse_code(vector<Token>& tkns)
                 codest.top()->args.push_back(Code {parsed, {}});
                 codest.push(&(*--codest.top()->args.end()));
                 mode = 2;
+                idx--;
             }    break;
              
             case 2: {
                 if (tkns[idx].val == "(") {
                     mode = 1;
+                    idx--;
                     // TODO ここi--いる？
                 } else if (tkns[idx].val == ")") {
                     codest.pop();
@@ -156,7 +171,11 @@ Code parse_code(vector<Token>& tkns)
 }
 
 
-/* NOTE: 関数の最後のトークンまでidxを移動させて返却します（一個次のトークンまでではないです） */
+/* NOTE:
+   変数の場合はそのまま返します(TODO これがやるべきことか？)
+   関数の最初（つまり'('から）のidxを受け取って
+   関数の最後のトークンまで（つまり')'まで）idxを移動させて返却します（一個次のトークンまでではないです
+*/
 string parse_fn(vector<Token>& tkns, int &idx)
 {
     Fn res = Fn { {{}, {}}, {} };
@@ -278,13 +297,19 @@ Code exec_code(Code code, int dbg = 0, bool trace = false)
              i++)
         {
             code.args[i] = exec_code(code.args[i], dbg+1);
-            
+        }
+
+        for (int i = 0;
+             i < code.fn()->argnames.size();
+             i++)
+        {
             bind[code.fn()->argnames[i].val] = Fn {
                 /*TODO:試験的*/{{},{"Int"}}, /*typ*/
                 lit_code(code.args[i].cal), /*code*/
                 {} /*argnames*/
             };
         }
+
 
         code = exec_code(applied, dbg+1);
 
@@ -343,23 +368,44 @@ int main() {
     return 0;
 }
 
-void test() {
+void test(bool verbose) {
     ifstream ifs("testcases.em");
 
-    string cd, ans;
+    string cd, ans, ito, kara;
+
+    if (verbose) cout << "wwwwwww TESTING wwwwwwww" << endl;
+
 
     while (true) {
+        if (!getline(ifs, ito)) break;
         if (!getline(ifs, cd)) break;
         if (!getline(ifs, ans)) break;
+        getline(ifs, kara);
         
-        cout << "Testing " << cd << " --- ";
+        if (verbose) {
+            cout << ito << endl;
+            cout << cd << endl;
+        } else {
+            cout << "Testing " << cd << " --- ";
+        }
 
         tkn.tokenize(cd);
-        string res = exec_code(parse_code(tkn.tokens)).cal;
-        if (res == ans) {
-            cout << "\033[1;32mPassed.\033[0m" << endl;
-        } else {
-            cout << "\033[1;31mError!\033[0m " << endl << "Expected '" << ans << "', but '" << res << "'." << endl;
+        try {
+            string res = exec_code(parse_code(tkn.tokens)).cal;
+
+            if (res == ans) {
+                cout << "\033[1;32mPassed.\033[0m" << endl;
+            } else {
+                cout << "\033[1;31mError!\033[0m " << endl << "Expected '" << ans << "', but '" << res << "'." << endl;
+                cout << ito << endl;
+            }
+        } 
+        catch (std::exception& e)
+        {
+            cerr << "\033[1;31mError!\033[0m " << endl << "Exception caught : " << e.what() << endl;
+            cout << ito << endl;
         }
+
+
     }
 }
