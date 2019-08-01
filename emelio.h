@@ -40,6 +40,10 @@ bool is_number(const std::string& s)
     return true;
 }
 
+bool is_literal(const std::string& s) {
+    return is_number(s);
+}
+
 
 #define EMELIO_H
 #endif

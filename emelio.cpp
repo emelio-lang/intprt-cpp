@@ -18,7 +18,7 @@ struct Fn;
 struct Code;
 
 struct Code {
-    Fn fn;
+    Fn *fn;
     vector<Code> args;
 
     // 試験的に計算結果をここに入れるようにしてみる
@@ -35,41 +35,70 @@ struct Fn {
 };
 
 Tokenizer tkn;
-Fn   __literal = Fn { {{},{}}, {Token{"__literal",0,0}} } //リテラル用
-,__main = Fn { {{},{}}, {Token{"__main"}} } //
-,__blank = Fn { {{},{}}, {Token{"__blank"}} } 
-;
+/* Fn  // __literal = Fn { {{},{}}, Code {0, {}, } } //リテラル用 */
+/* ; */
 unsigned long noname_counter = 0;
 map<string, Fn> bind = {
-    { "add",    Fn { {{"Int","Int"},{"Int"}}, {Token{"--add"}} } },
-    { "negate", Fn { {{"Int"},{"Int"}}, {Token{"--negate"}} } },
-    { "let",    Fn { {{"_Bind", "#Symbol"},{"()", "_Bind"}}, {Token{"--let"}} } },
+    { "add",    Fn { {{"Int","Int"},{"Int"}}, Code {0, {}, "__+"} }},
+    { "negate", Fn { {{"Int"},{"Int"}}, Code {0, {}, "__-"}}},
+    { "let",    Fn { {{"_Bind", "#Symbol"},{"()", "_Bind"}}, Code {0, {}, "__let"}} },
 };
-// TODO: 一時用のリテラル用束縛情報, Fnとうまく扱う方法を考えてbindと統合して欲しい
-map<string, Code&> litbind = {
-};
-Code maincode = Code { __main, {} };
 
-void showCode(Code& code, int lvl = 0) {
-    cout << string("  ") * lvl << "Code: ";
-    for (Token t : code.fn.body) cout << t.val;
-    cout << endl;
-    for (Code arg : code.args) showCode(arg, lvl+1);
-}
+/*********************/
+/*FUNCTION PROTOTYPES*/
+/*********************/
+Code lit_code(string l);
+int lit_int(Code code);
+Fn *refer_fn(string name);
+Code parse_code(vector<Token>& tkns);
+Fn *parse_fn(vector<Token>& tkns, int &idx);
+int exec_code(Code&, int dbg = 0);
 
-void showProgram() { showCode(maincode, 0); }
-
-Code lit_code(string l) {
-    return Code {__literal, {}, l};
-}
-
-int lit_int(Code code) {
-    if (code.cal == "") {
-        cout << "Something wrong happened." << endl;
-        cout << "Code hasn't been calculated: " << endl;
-        showCode(code);
-        cout << endl;
+void showCode(Code& code, int lvl=0)
+{
+    if (code.fn) {
+        cout << string("  ") * lvl;
+        if (code.fn->argnames.size() != 0) {
+            cout << "\\";
+            for (auto argname : code.fn->argnames) {
+                cout << argname.val << " ";
+            }
+        }
+        showCode(code.fn->body, lvl);
+    } else {
+        cout << code.cal;
     }
+//    cout << endl;
+
+    if (code.args.size() != 0) {
+        cout << "[";
+
+        for (Code arg : code.args) {
+            showCode(arg, lvl+1);
+            cout << " ";
+        }
+        cout <<  "]" << endl;
+    }
+}
+
+Code lit_code(string l)
+{
+    return Code {0, {}, l};
+}
+
+int lit_int(Code code)
+{
+    // ここで計算されてなくても、次のexec_codeで計算されるので大丈夫？
+    // if (code.cal == "") {
+    //     cout << "Something wrong happened." << endl;
+    //     cout << "Code hasn't been calculated: " << endl;
+    //     showCode(code);
+    //     cout << endl;
+    // }
+
+    
+    // TODO: 試験的にここで変数を展開
+    exec_code(code);
 
     // type check function for Int
     if (!is_number(code.cal)) {
@@ -83,20 +112,26 @@ int lit_int(Code code) {
 
 
 
-Fn& refer_fn(string name) {
+Fn *refer_fn(string name)
+{
     // refer to bind table and store function's reference
-    if (!CONTAINS(bind, name)) {
-        cout << "[Error] undefinied function \"" << tkn.tokenval[i] << "\""
-             << " (" << tkn.token[i].line << ":" << tkn.token[i].col << ")" << endl;
-        return;
-    }
 
-    return bind[name];
+    return &bind[name];
 }
 
-Code parse_code(vector<Token>& tkns) {
+Code parse_code(vector<Token>& tkns)
+{
+    int idx = 0;
     stack<Code*> codest = {};
-    Code res = /*{fn args cal}*/ Code {bind[tkn.tokenvals[0]], {}};
+    
+    Code res;
+    // NOTE: 先に書き換えの処理を行っておくこと(notation!) 1+2とかでバグる
+    if (is_literal(tkns[idx].val)) {
+        res = lit_code(tkns[idx].val);
+        return res;
+    } else {
+        res = /*{fn args cal}*/ Code {parse_fn(tkns, idx), {}};
+    }
     codest.push(&res);
     int mode = 0; /*
                     0 -- initial
@@ -105,33 +140,29 @@ Code parse_code(vector<Token>& tkns) {
                   */
     mode = 2;
     
-    for (int i = 2; i < tkn.tokenvals.size(); ++i) {
+    for (idx++; idx < tkns.size(); ++idx) {
         switch (mode) {
-            case 1:
-                if (tkn.tokenvals[i] == ")") continue;
+            case 1: {
+                if (tkns[idx].val == ")") continue;
 
                 // here, it is a function or a name of function
 
-                Fn& parsed = parse_fn(i);
+                Fn* parsed = parse_fn(tkns, idx);
                 codest.top()->args.push_back(Code {parsed, {}});
                 codest.push(&(*--codest.top()->args.end()));
                 mode = 2;
-                break;
+            }    break;
              
-            case 2:
-                if (tkn.tokenvals[i] == "(") {
+            case 2: {
+                if (tkns[idx].val == "(") {
                     mode = 1;
-                } else if (tkn.tokenvals[i] == ")") {
+                    // TODO ここi--いる？
+                } else if (tkns[idx].val == ")") {
                     codest.pop();
                 } else {
-                    if (is_number(tkn.tokens[i])) {
-                        codest.top()->args.push_back(lit_code(tkn.tokens[i]));
-                    } else {
-                        // 関数を表しているときもある
-                        codest.top()->args.push_back(Code {__blank, {}, tkn.tokens[i]});
-                    }
+                    codest.top()->args.push_back(lit_code(tkns[idx].val));
                 }
-                break;
+            }    break;
         }
     }
 
@@ -139,69 +170,102 @@ Code parse_code(vector<Token>& tkns) {
 }
 
 
-Fn& parse_fn(int &idx) {
+/* NOTE: 関数の最後のトークンまでidxを移動させて返却します（一個次のトークンまでではないです） */
+Fn *parse_fn(vector<Token>& tkns, int &idx)
+{
     Fn res = Fn { {{}, {}}, {} };
     // 名前だけのときもある
-    if (tkn.tokenvals[idx] == '(') {
+    if (tkns[idx].val == "(") {
         idx++;
         int mode = 0; /*
                         1 -- args
                         
-                       */
-        
-        if (tkn.tokenvals[idx] == '|') {
-            idx++;
-            for (; idx < tkn.tokenvals.size(); idx++) {
-                if (tkn.tokenvals[idx] == '|')
-                    goto success1;
+                      */
 
-                res.argnames.push_back(tkn.token[idx]);
+        // NOTE: |がネストすることはないよね？
+        if (tkns[idx].val == "|") {
+            idx++;
+            for (; idx < tkns.size(); idx++) {
+                if (tkns[idx].val == "|") {
+                    idx++;
+                    goto success1;
+                }
+                
+                res.argnames.push_back(tkns[idx]);
             }
 
             cout << "[Error] No corresponding |" << endl;
-success1:
         }
+success1:
+
 
         // TODO: subvectorをもう一度構築しているので
         // メモリ的により効率的な方法がありますか？
         vector<Token> fn_body_tkns = {};
+        int paren = 0;
         
-        for (; idx < tkn.tokenvals.size(); idx++) {
-            if (tkn.token[idx] == ')') {
-                res.body = parse_code(fn_body_tkns);
-                goto success2;
+        for (; idx < tkns.size(); idx++) {
+            if (tkns[idx].val == "(") paren++;
+            if (tkns[idx].val == ")") {
+                paren--;
+                if (paren == -1) {
+                    res.body = parse_code(fn_body_tkns);
+                    goto success2;
+                }
             }
 
-            fn_body_tkns.push_back(tkn.token[idx]);
+            fn_body_tkns.push_back(tkns[idx]);
         }
         
         cout << "[Error] No corresponding (" << endl;
         
 success2:
-        bind.push_back(make_pair("__noname" + noname_counter, res));
+        noname_counter++;
+        bind.insert(make_pair("__noname" + to_string(noname_counter), res));
 
-        return bind["__noname" + noname_counter];
+        return &bind["__noname" + to_string(noname_counter)];
     } else {
         // TODO: 名前参照
-        return refer_fn(tkn.tokenvals[idx]);
+        Fn* refn = refer_fn(tkns[idx].val);
+        if (!refn) {
+            cout << "[Error] undefinied function \"" << tkns[idx].val << "\""
+                 << " (" << tkns[idx].line << ":" << tkns[idx].col << ")" << endl;
+            return 0;
+        }
+        return refn;
     }
 }
 
-Code exec_code(Code code) {
+int exec_code(Code &code, int dbg)
+{
+    cout << string(" ") * dbg << "Calculating... ";
+    showCode(code);
+    cout << endl;
+    
     // 変数なら、今は計算済みなはず(TODOﾎﾝﾄ？関数を含んでいる変数は？)なので解決して返す
-    if (REFEQUAL(code.fn, __blank))
-        return lit_code(litbind[code.cal]);
+    // リテラルなら何もしない
+    if (!code.fn) {
+        if (!is_number(code.cal)) {
+            if (!bind[code.cal].body.fn) {
+                code.cal = bind[code.cal].body.cal;
+            } else {
+                code = bind[code.cal].body; // TODO: 試験的
+            }
+        }
+
+        cout << string(" ") * dbg << "done.";
+        showCode(code);
+        cout << endl;
+
+        return 1;
+    }
                                             
-    // 計算済みなら計算することはない
-    if (code.cal != "") return code;
-
-
-    if (REFEQUAL(code.fn, bind["negate"])) {
+    if (code.fn == &bind["negate"]) {
         int a1 = lit_int(code.args[0]);
         
         code.cal = to_string(-a1);
     }
-    else if (REFEQUAL(code.fn, bind["add"])) {
+    else if (code.fn == &bind["add"]) {
         int a1 = lit_int(code.args[0]);
         int a2 = lit_int(code.args[1]);
 
@@ -214,82 +278,35 @@ Code exec_code(Code code) {
            なので、関数のbodyで引数を全て置き換えたCodeを新たに作ってそれを実行した結果を返す。
          */
 
-        Code applied = code.fn.body;
-        map<string, Code&> tmp_litbind = litbind;
+        Code applied = code.fn->body;
+        map<string, Fn> tmp_bind = bind;
 
         for (int i = 0;
-             i < code.fn.argnames;
+             i < code.fn->argnames.size();
              i++)
         {
+            cout << "Argument " << i << endl;
+            exec_code(code.args[i], dbg+1);
             
-            litbind[code.fn.argnames[i]] = code.args[i];
+            bind[code.fn->argnames[i].val] = Fn {
+                /*TODO:試験的*/{{},{"Int"}}, /*typ*/
+                lit_code(code.args[i].cal), /*code*/
+                {} /*argnames*/
+            };
         }
 
-        code = exec_code(applied);
+        exec_code(applied, dbg+1);
+        code = applied;
 
-        litbind = tmp_litbind;
+        bind = tmp_bind;
     }
 
-    return code;
+    cout << string(" ") * dbg << "done.";
+    showCode(code);
+    cout << endl;
+    return 1;
 }
 
-
-void exec() {
-    stack<Code*> codest = {};
-    int mode = 0; /*
-                    0 -- initial
-                    1 -- new function
-                    2 -- new argument
-                  */
-    maincode.args.push_back(Code {bind[tkn.tokenvals[1]], {}});
-    codest.push(&(*--maincode.args.end()));
-    mode = 2;
-    
-    for (int i = 2; i < tkn.tokenvals.size(); ++i) {
-        switch (mode) {
-            case 1:
-                if (tkn.tokenvals[i] == ")") continue;
-
-                // here, it is a function or a name of function
-
-                Fn& parsed = parse_fn(i);
-                codest.top()->args.push_back(Code {parsed, {}});
-                codest.push(&(*--codest.top()->args.end()));
-                mode = 2;
-            break;
-             
-            case 2:
-                if (tkn.tokenvals[i] == "(") {
-                    mode = 1;
-                } else if (tkn.tokenvals[i] == ")") {
-                    Code* t = codest.top();
-
-                    // TODO: 関数だけの型チェックとかはできんの？
-
-                    if (REFEQUAL(t->fn, bind["negate"])) {
-                        int a1 = lit_int(t->args[0]);
-        
-                        t->cal = to_string(-a1);
-                    }
-                    else if (REFEQUAL(t->fn, bind["add"])) {
-                        int a1 = lit_int(t->args[0]);
-                        int a2 = lit_int(t->args[1]);
-
-                        t->cal = to_string(a1 + a2);
-                    }
-                    else {
-                        for (string argname : t->fn.argnames) {
-                            
-                        }
-                    }
-                    codest.pop();
-                } else {
-                    codest.top()->args.push_back(lit_code(tkn.tokens[i]));
-                }
-            break;
-        }
-    }
-}
 
 
 int main() {
@@ -298,12 +315,15 @@ int main() {
 
     showv(tkn.tokenvals);
 
-    parse_code(tkn);
-    exec_code(tkn);
+    Code maincode = parse_code(tkn.tokens);
 
-    showProgram();
+    showCode(maincode);
 
-    cout << maincode.args[0].cal << endl;
+    exec_code(maincode);
+
+    cout << endl << endl;
+
+    cout << maincode.cal << endl;
 
     return 0;
 }
