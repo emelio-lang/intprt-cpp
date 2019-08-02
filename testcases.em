@@ -62,10 +62,6 @@ add ((2)) (((3)))
 (|x1 y1 z1 w1| add w1 ((|x2 y2 z2| add z2 ((|x3 y3| add x3 y3) x2 y2)) x1 y1 z1)) 10 30 24 1
 65
 
-多重関数 + 冗長
-(|x1 y1 z1 w1| add w1 ((|x2 y2 z2| (add z2 ((|x3 y3| (add x3 y3)) x2 y2)) x1 y1 z1))) 10 30 24 1
-65
-
 シャドウ
 (|x y z w| add w ((|x y z| add z ((|x y| add x y) x y)) x y z)) 10 30 24 1
 65
@@ -73,3 +69,11 @@ add ((2)) (((3)))
 引数に関数評価が必要
 (|x y| (|u| add u 3) x) ((|a| 1) 3) 5
 4
+
+引数と名前の衝突
+(|x y| add x y) ((|x| negate x) 3) ((|x| x) 5)
+2
+
+多重関数 + 冗長
+(|x1 y1 z1 w1| add w1 ((|x2 y2 z2| (add z2 ((|x3 y3| (add x3 y3)) x2 y2)) x1 y1 z1))) 10 30 24 1
+65

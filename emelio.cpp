@@ -357,7 +357,7 @@ int main() {
 
     showCode(maincode);
 
-    maincode = exec_code(maincode);
+    maincode = exec_code(maincode, 0, true);
 
     cout << endl << endl;
 
