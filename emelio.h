@@ -1,4 +1,5 @@
-#if !defined(EMELIO_H)
+#ifndef EMELIO_H
+#pragma once
 /* ========================================================================
    $File: emelio.h $
    $Date: Jul 07 2019 $
@@ -7,43 +8,50 @@
    $Notice: (C) Copyright 2019 by Creative GP. All Rights Reserved. $
    ======================================================================== */
 
+#include <iterator>
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <stack>
+#include <map>
+
+#include "Tokenizer/util.h"
+#include "Tokenizer/tokenizer.h"
+
+
 #define CONTAINS(c,v) ((c).find(v) != (c).end())
 #define REFEQUAL(a,b) (&(a) == &(b))
 
 template<typename Char, typename Traits, typename Allocator>
 std::basic_string<Char, Traits, Allocator> operator *
-(const std::basic_string<Char, Traits, Allocator> s, size_t n)
-{
-   std::basic_string<Char, Traits, Allocator> tmp = s;
-   for (size_t i = 0; i < n; ++i)
-   {
-      tmp += s;
-   }
-   return tmp;
-}
+(const std::basic_string<Char, Traits, Allocator> s, size_t n);
 
 template<typename Char, typename Traits, typename Allocator>
 std::basic_string<Char, Traits, Allocator> operator *
-(size_t n, const std::basic_string<Char, Traits, Allocator>& s)
-{
-   return s * n;
-}
+(size_t n, const std::basic_string<Char, Traits, Allocator>& s);
 
-bool is_number(const std::string& s)
-{
-    int a;
-    try {
-        int a = stoi(s);
-    } catch (invalid_argument& e) {
-        return false;
-    }
-    return true;
-}
+bool is_number(const std::string& s);
+bool is_literal(const std::string& s);
 
-bool is_literal(const std::string& s) {
-    return is_number(s);
-}
+#define ARG(x) const x&
+
+struct L;
+
+typedef string Lp;
+
+struct L {
+    Lp body;
+    map<string,Lp> argbind = {};
+};
+
+struct ProgramData {
+    L root;
+    map<string, L> bind;
+};
 
 
-#define EMELIO_H
+pair<ProgramData,int> parse(ARG(vector<string>) tknvals, int initial_idx = 0, string basename = "");
+
+
+#define EMELIO_H 1
 #endif
