@@ -85,6 +85,11 @@ Code code(ParserFlow& p);
 //pair<ProgramData,int> parse(ARG(vector<string>) tknvals, int initial_idx = 0, string basename = "");
 
 
+ostream& operator<<(ostream& stream, const Literal&);
+ostream& operator<<(ostream& stream, const Code&);
+ostream& operator<<(ostream& stream, const Lambda&);
+ostream& operator<<(ostream& stream, Lambda*);
+
 
 #define EMELIO_H 1
 #endif

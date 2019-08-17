@@ -26,3 +26,35 @@ std::basic_string<Char, Traits, Allocator> operator *
 {
    return s * n;
 }
+
+
+ostream& operator<<(ostream& stream, const Literal& lit) {
+    stream << "<" << lit.val << ">";
+    return stream;
+}
+
+ostream& operator<<(ostream& stream, Lambda* l) {
+    stream << "(λ ";
+    for (auto a : l->argnames) stream << a << " ";
+    stream << l->body << ")" << endl;
+    return stream;
+}
+
+ostream& operator<<(ostream& stream, const Code& c) {
+    if (c.l) {
+        stream << c.l;
+    } else if (c.lit.val != "") {
+        stream << "(λ " << c.lit << ")";
+    }
+    stream << "[";
+    for (auto a : c.args) stream << a << ",";
+    stream << "]";
+    return stream;
+}
+
+ostream& operator<<(ostream& stream, const Lambda& l) {
+    stream << "(λ ";
+    for (auto a : l.argnames) stream << a << " ";
+    stream << l.body << ")" << endl;
+    return stream;
+}
