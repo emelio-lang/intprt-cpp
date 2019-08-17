@@ -1,8 +1,16 @@
-make: Tokenizer/tokenizer.cpp Tokenizer/util.cpp util.cpp emelio.cpp parse.cpp
-	g++ Tokenizer/tokenizer.cpp Tokenizer/util.cpp util.cpp parse.cpp emelio.cpp  -o emelio -g3
+%.cpp.cc: %.cpp
+	python pp.py $<
+	astyle $@ -Y
+	rm *.orig
 
-clang: Tokenizer/tokenizer.cpp Tokenizer/util.cpp util.cpp emelio.cpp parse.cpp
-	clang Tokenizer/tokenizer.cpp Tokenizer/util.cpp util.cpp parse.cpp emelio.cpp  -o emelio
+clean: 
+	rm *.cpp.cc
+
+build: Tokenizer/tokenizer.cpp Tokenizer/util.cpp util.cpp emelio.cpp parse.cpp.cc
+	g++ Tokenizer/tokenizer.cpp Tokenizer/util.cpp util.cpp emelio.cpp  parse.cpp.cc -o emelio -g3 -std=c++17
+
+clang: Tokenizer/tokenizer.cpp Tokenizer/util.cpp util.cpp emelio.cpp parse.cpp.cc
+	clang Tokenizer/tokenizer.cpp Tokenizer/util.cpp util.cpp emelio.cpp parse.cpp.cc -o emelio -std=c++17
 
 run: emelio
 	./emelio

@@ -1,0 +1,28 @@
+/* ========================================================================
+   $File: util.cpp $
+   $Date: Aug 08 2019 $
+   $Revision: $
+   $Creator: Creative GP $
+   $Notice: (C) Copyright 2019 by Creative GP. All Rights Reserved. $
+   ======================================================================== */
+
+#include "emelio.h"
+
+template<typename Char, typename Traits, typename Allocator>
+std::basic_string<Char, Traits, Allocator> operator *
+(const std::basic_string<Char, Traits, Allocator> s, size_t n)
+{
+   std::basic_string<Char, Traits, Allocator> tmp = s;
+   for (size_t i = 0; i < n; ++i)
+   {
+      tmp += s;
+   }
+   return tmp;
+}
+
+template<typename Char, typename Traits, typename Allocator>
+std::basic_string<Char, Traits, Allocator> operator *
+(size_t n, const std::basic_string<Char, Traits, Allocator>& s)
+{
+   return s * n;
+}

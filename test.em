@@ -1,2 +1,2 @@
-((|f g| (|x| (f (g (x))))) (negate) (negate)) (3)
+add 2 3
 
