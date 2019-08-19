@@ -11,17 +11,17 @@
 #define NOW p.tknvals[p.idx]
 #define PASER(type, name)
 
-{!MONAD <> e <> t <> u <> {#e = #u(p);    /*p = tmp1.second;*/}!}
-{!MONAD_P <> e <> t <> u <> {#e = &#u(p); /*p = tmp1.second;*/}!}
-{!MONAD_F <> e <> t <> u <> {#e(#u(p));   /*p = tmp1.second;*/}!}
-{!SKIP <> s <> if (p.tknvals[p.idx] == #s) p.idx++; else cout << "Excepts " << #s << " but " << p.tknvals[p.idx] << endl; !}
-{!PARSE <> type <> name <> #type #name(ParserFlow& p) !}
-
 // {!MONAD <> e <> t <> u <> {const pair<#t, ParserFlow&> tmp1 = #u(p); #e = tmp1.first;    /*p = tmp1.second;*/}!}
 // {!MONAD_P <> e <> t <> u <> {const pair<#t, ParserFlow&> tmp1 = #u(p); #e = &tmp1.first; /*p = tmp1.second;*/}!}
 // {!MONAD_F <> e <> t <> u <> {const pair<#t, ParserFlow&> tmp1 = #u(p); #e(tmp1.first);   /*p = tmp1.second;*/}!}
 // {!SKIP <> s <> if (p.tknvals[p.idx] == #s) p.idx++; else cout << "Excepts " << #s << " but " << p.tknvals[p.idx] << endl; !}
 // {!PARSE <> type <> name <> pair<#type, ParserFlow&> #name(ParserFlow& p) !}
+
+{!MONAD <> e <> t <> u <> {#e = #u(p);    /*p = tmp1.second;*/}!}
+{!MONAD_P <> e <> t <> u <> {#e = &#u(p); /*p = tmp1.second;*/}!}
+{!MONAD_F <> e <> t <> u <> {#e(#u(p));   /*p = tmp1.second;*/}!}
+{!SKIP <> s <> if (p.tknvals[p.idx] == #s) p.idx++; else cout << "Excepts " << #s << " but " << p.tknvals[p.idx] << endl; !}
+{!PARSE <> type <> name <> #type #name(ParserFlow& p) !}
 
 int lctn_idx = 0;
 array<Lambda, 10000> lctn;

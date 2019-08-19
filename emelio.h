@@ -83,6 +83,7 @@ extern array<Lambda, 10000> lctn;
 
 Code code(ParserFlow& p);
 //pair<ProgramData,int> parse(ARG(vector<string>) tknvals, int initial_idx = 0, string basename = "");
+Code reduction(Code code);
 
 
 ostream& operator<<(ostream& stream, const Literal&);

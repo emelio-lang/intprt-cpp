@@ -1,2 +1,1 @@
-add 2 3
-
+(|x y z| add z ((|x y| add x y) x y)) 1 2 3
