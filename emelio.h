@@ -84,7 +84,7 @@ extern array<Lambda, 10000> lctn;
 
 Code code(ParserFlow& p);
 //pair<ProgramData,int> parse(ARG(vector<string>) tknvals, int initial_idx = 0, string basename = "");
-Code reduction(Code code);
+Code reduction(Code code, bool silent = false);
 
 std::string random_string( size_t length );
 

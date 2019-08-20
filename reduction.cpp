@@ -153,9 +153,19 @@ pair<Code, ReductionFlow> reduction(Code code, ReductionFlow rf) {
 }
 
 
-Code reduction(Code code) {
+Code reduction(Code code, bool silent) {
+    auto back = cout.rdbuf();
+    if (silent) {
+        cout.rdbuf(NULL);
+    }
+
     ReductionFlow rf = {};
-    return reduction(code, rf).first;
+    Code redu = reduction(code, rf).first;
+
+    if (silent) {
+        cout.rdbuf(back);
+    }
+    return redu;
 }
 
 

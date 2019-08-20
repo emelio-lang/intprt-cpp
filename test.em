@@ -1,1 +1,1 @@
-(|x y z| add z ((|x y| add x y) x y)) 1 2 3
+(|x y| add x y) ((|x| negate x) 3) ((|x| x) 5)
