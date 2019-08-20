@@ -49,11 +49,11 @@ void test(bool verbose = false) {
             ParserFlow pf = {tkn.tokenvals, 0};
             Code root = code(pf);
 
-            // cout << root << endl;
+            cout << root << endl;
 
-            string res = reduction(root).lit.val;
+             string res = reduction(root).lit.val;
             
-//            string res = exec_code(parse_code(tkn.tokens)).cal;
+// //            string res = exec_code(parse_code(tkn.tokens)).cal;
 
             if (res == ans) {
                 cout << "\033[1;32mPassed.\033[0m" << endl;
@@ -87,7 +87,7 @@ int main() {
 
     cout << reduction(root) << endl;
 
-    // test(true);
+//    test(true);
 
     return 0;
 }

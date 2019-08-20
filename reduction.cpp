@@ -20,6 +20,8 @@ struct ReductionFlow {
         { "negate", &c_negate },
     };
     stack<Code*> argstack;
+    // NOTE: 未計算のままshadowingするために必要
+    map<string, string> shadower;
 };
 
 bool check_computed(const Code* c) {
@@ -52,16 +54,37 @@ Code make_int_litcode(int n) {
     return Code { 0, Literal { to_string(n) }, {} };
 }
 
+Code *ref(string name, ReductionFlow &rf) {
+    if (CONTAINS(rf.shadower, name)) {
+        string probe = rf.bind[rf.shadower[name]]->lit.val;
+        if (CONTAINS(rf.shadower, probe)) {
+            return rf.bind[probe]; 
+        }
+        // while (CONTAINS(rf.shadower, probe)) {
+        //     name = probe;
+        //     probe = rf.bind[probe]->lit.val;
+        // }
+        
+        return rf.bind[rf.shadower[name]];
+    }
+    return rf.bind[name];
+}
+#define ref(a) ref(a,rf)
+
+
 pair<Code, ReductionFlow> reduction(Code code, ReductionFlow rf) {
+
+    cout << "Reductioning ... " << endl;
+    cout << code << endl;
 
     if (!code.l) {
         if (is_literal(code.lit.val)) return make_pair(code,rf);
         else {
             if (CONTAINS(rf.bind, code.lit.val)) {
-                Code res = *rf.bind[code.lit.val];
+                Code res = *ref(code.lit.val);
                 while (!res.l) {
                     if (is_literal(res.lit.val)) return make_pair(res, rf);
-                    res = *rf.bind[res.lit.val];
+                    res = *ref(res.lit.val);
                 }
                 code.l = res.l;
                 code.lit = res.lit;
@@ -94,12 +117,18 @@ pair<Code, ReductionFlow> reduction(Code code, ReductionFlow rf) {
             arg = rf.argstack.top();
             rf.argstack.pop();
         }
-        rf.bind[argname] = arg;
+
+        if (CONTAINS(rf.bind, argname)) {
+            rf.shadower[argname] = random_string(16);
+            // TODO: 衝突!
+            rf.bind[rf.shadower[argname]] = arg;
+        } else
+            rf.bind[argname] = arg;
     }
 
     if (code.lit.val == "add") {
-        Code a1 = reduction(*rf.bind["a1"],rf).first;
-        Code a2 = reduction(*rf.bind["a2"],rf).first;
+        Code a1 = reduction(*ref("a1"),rf).first;
+        Code a2 = reduction(*ref("a2"),rf).first;
         pair<int,bool> tmp1 = read_int_litcode(a1);
         pair<int,bool> tmp2 = read_int_litcode(a2);
             
@@ -108,7 +137,7 @@ pair<Code, ReductionFlow> reduction(Code code, ReductionFlow rf) {
         else
             return make_pair(Code {&add, "add", code.args}, rf); // NOTE: ここのliteralを入れておくことでbodyが無いことを示せる
     } else if (code.lit.val == "negate") {
-        Code a1 = reduction(*rf.bind["a1"],rf).first;
+        Code a1 = reduction(*ref("a1"),rf).first;
         pair<int,bool> tmp1 = read_int_litcode(a1);
             
         if (tmp1.second) 
