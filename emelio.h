@@ -69,6 +69,9 @@ struct Code {
     Lambda *l;
     Literal lit;
     vector<Code> args;
+
+    // NOTE: tknvalsは変更されないことを想定しています
+    vector<string>::iterator srcbeg, srcend;
 };
 
 struct Lambda {

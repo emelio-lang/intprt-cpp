@@ -70,6 +70,8 @@ array<Lambda, 10000> lctn;
 {
     Code c = {};
 
+    c.srcbeg = next(p.tknvals.begin(), (int) p.idx);
+
 //    {- SKIP <> "(" -}
 
     if (NOW == "(") {
@@ -80,6 +82,8 @@ array<Lambda, 10000> lctn;
 
 //    {- SKIP <> ")" -}
 
+    c.srcend = next(p.tknvals.begin(), p.idx);
+    
     return c;
 }
 
@@ -88,6 +92,7 @@ array<Lambda, 10000> lctn;
 {- PARSE <> Code <> code -}
 {
     Code c = {};
+    c.srcbeg = next(p.tknvals.begin(), p.idx);
 
 //    {- SKIP <> "(" -}
 
@@ -107,6 +112,7 @@ array<Lambda, 10000> lctn;
 
 
 //    {- SKIP <> ")" -}
+    c.srcend = next(p.tknvals.begin(), p.idx);
 
     return c;
 }
