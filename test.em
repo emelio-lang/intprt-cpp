@@ -1,1 +1,1 @@
-(|x y| add x y) ((|x| negate x) 3) ((|x| x) 5)
+(|x1 y1 z1 w1| add w1 ((|x2 y2 z2| (add z2 ((|x3 y3| (add x3 y3)) x2 y2)) x1 y1 z1))) 10 30 24 1

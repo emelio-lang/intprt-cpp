@@ -97,7 +97,7 @@ array<Lambda, 10000> lctn;
         {- MONAD <> c.lit <> Literal <> literal -}
     }
 
-    while (true) {
+    while (p.idx < p.tknvals.size()) {
         if (NOW == ")" || NOW == "") {
             break;
         }
