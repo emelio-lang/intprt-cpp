@@ -3,14 +3,35 @@
 	astyle $@ -Y
 	rm *.orig
 
+%.a: %.o
+	ar r $@ $<
+	ranlib $@
+
+tkutil.o: Tokenizer/util.cpp
+	g++ -c $< -g3 -o $@
+tk.o: Tokenizer/tokenizer.cpp
+	g++ -c $< -g3 -o $@
+util.o: util.cpp
+	g++ -c $< -g3 -o $@
+reduction.o: reduction.cpp.cc
+	g++ -c $< -g3 -o $@
+parse.o: parse.cpp.cc
+	g++ -c $< -g3 -o $@
+emelio.o: emelio.cpp
+	g++ -c $< -g3 -o $@
+
+
+OBJS = tkutil.o tk.o util.o parse.o reduction.o emelio.o
+
+
 clean: 
 	rm *.cpp.cc
 
-build: Tokenizer/tokenizer.cpp Tokenizer/util.cpp util.cpp emelio.cpp parse.cpp.cc reduction.cpp.cc
-	g++ Tokenizer/tokenizer.cpp Tokenizer/util.cpp util.cpp emelio.cpp  parse.cpp.cc reduction.cpp.cc -o emelio -g3 -std=c++17
+build: $(OBJS)
+	g++ -o emelio $(OBJS)
 
-clang: Tokenizer/tokenizer.cpp Tokenizer/util.cpp util.cpp emelio.cpp parse.cpp.cc reduction.cpp.cc
-	clang Tokenizer/tokenizer.cpp Tokenizer/util.cpp util.cpp emelio.cpp parse.cpp.cc reduction.cpp.cc -o emelio -std=c++17
+clang: $(OBJS)
+	clang -std=c++17 -o emelio $(OBJS)
 
 test:
 	./utest.sh
