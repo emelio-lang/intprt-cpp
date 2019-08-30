@@ -156,6 +156,14 @@ inline bool is_notation_variable(const string& s) {
     return res;
 }
 
+inline bool is_notation_free_variable(const string& s) {
+    bool res = true;
+    for (int i = 0; i < s.size()-1; ++i)
+        if (!isupper(s[i])) res = false;
+    if (s.back() != '?') res = false;
+    return res;
+}
+
 void
 replace(vector<vector<string>> &matches,
         const vector<string>& config, 
@@ -203,20 +211,30 @@ void match(
     vector<vector<string>> &res,
     const vector<string>& base,
     const vector<string>& config,
-    string exit_token = "",
+    pair<string,int> exit_token = "",
     bool forward = true)
 {
-    if (exit_token == "") {
-        for (auto c : config) if (!is_notation_variable(c)) {
-                exit_token = c;
+    if (exit_token.first == "") {
+        int i = 0;
+        for (auto c : config) {
+            if (!is_notation_variable(c)) {
+                exit_token = make_pair(c, i);
                 break;
             }
+            i++;
+        }
     }
 
     if (forward) {
         vector<string> buf;
         int c = 0;
         for (int i = 0; i < base.size(); ++i) {
+            if (base[i] == exit_token.first && i-exit_token.second <= 0) {
+                for (int j = 0; j < exit_token.second; ++j)
+                    res.push_back(base[j]);
+                res.push_back(base[i]);
+            }
+            
             if (c+1 < config.size() && base[i] == config[c+1]) {
                 res.push_back(buf);
                 buf.clear();
