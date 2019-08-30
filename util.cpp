@@ -8,6 +8,28 @@
 
 #include "emelio.h"
 
+#include <cctype>
+#include <locale>
+#include <sstream>
+
+vector<string> split(const string &s, char delim) {
+    vector<string> elems;
+    string item;
+    for (char ch: s) {
+        if (ch == delim) {
+            if (!item.empty())
+                elems.push_back(item);
+            item.clear();
+        }
+        else {
+            item += ch;
+        }
+    }
+    if (!item.empty())
+        elems.push_back(item);
+    return elems;
+}
+
 template<typename Char, typename Traits, typename Allocator>
 std::basic_string<Char, Traits, Allocator> operator *
 (const std::basic_string<Char, Traits, Allocator> s, size_t n)
@@ -75,3 +97,40 @@ std::string random_string( size_t length )
     std::generate_n( str.begin(), length, randchar );
     return str;
 }
+
+std::string random_sane_string( size_t length )
+{
+    auto randchar = []() -> char
+    {
+        const char charset[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz";
+        const size_t max_index = (sizeof(charset) - 1);
+        return charset[ rand() % max_index ];
+    };
+    std::string str(length,0);
+    std::generate_n( str.begin(), length, randchar );
+    return str;
+}
+
+std::string random_saneupper_string( size_t length )
+{
+    auto randchar = []() -> char
+    {
+        const char charset[] =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        const size_t max_index = (sizeof(charset) - 1);
+        return charset[ rand() % max_index ];
+    };
+    std::string str(length,0);
+    std::generate_n( str.begin(), length, randchar );
+    return str;
+}
+
+bool is_all_upper(string &s) {
+    return accumulate(s.begin(), s.end(), true, [](bool acc, char i) {
+                                                    return acc && isupper(i);
+                                                });
+}
+
+ 

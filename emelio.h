@@ -10,6 +10,8 @@
 
 #include <iterator>
 #include <algorithm>
+#include <cctype>
+#include <numeric>
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -23,7 +25,10 @@
 
 #define CONTAINS(c,v) ((c).find(v) != (c).end())
 #define REFEQUAL(a,b) (&(a) == &(b))
+#define INDEXOF(c,v) (distance((c).begin(), find((c).begin(), (c).end(), v)))
 
+vector<string> split(const string &s, char delim);
+    
 template<typename Char, typename Traits, typename Allocator>
 std::basic_string<Char, Traits, Allocator> operator *
 (const std::basic_string<Char, Traits, Allocator> s, size_t n);
@@ -90,6 +95,9 @@ Code code(ParserFlow& p);
 Code reduction(Code code, bool silent = false);
 
 std::string random_string( size_t length );
+std::string random_sane_string( size_t length );
+std::string random_saneupper_string( size_t length );
+bool is_all_upper(string &s);
 
 
 
@@ -97,6 +105,7 @@ ostream& operator<<(ostream& stream, const Literal&);
 ostream& operator<<(ostream& stream, const Code&);
 ostream& operator<<(ostream& stream, const Lambda&);
 ostream& operator<<(ostream& stream, Lambda*);
+
 
 
 #define EMELIO_H 1

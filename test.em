@@ -1,1 +1,10 @@
-(|x1 y1 z1 w1| add w1 ((|x2 y2 z2| (add z2 ((|x3 y3| (add x3 y3)) x2 y2)) x1 y1 z1))) 10 30 24 1
+(notation (A $ B) (A (B)) (
+(notation (let A = B ; C) ((|A| C) (B)) (
+(notation (A ; B) ((|x| B) (A)) (
+    let c = add 2 3;
+    add 3 2;
+    add 2 c
+))
+))
+))
+
