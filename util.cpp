@@ -14,19 +14,21 @@
 #include <sstream>
 
 
-Code::Code(const Code& other) {
-    lit = other.lit;
-    src = other.src;
+// Code::Code(const Code& other) {
+//     lit = other.lit;
+//     src = other.src;
     
-    if (other.l) {
-        l = new Lambda;
-        *l = *other.l;
-    }
+//     if (other.l) {
+//         l = unique_ptr<Lambda>(new Lambda);
+//         *l = *other.l;
+//     }
 
-    for (Code c : other.args) {
-        args.push_back(Code(c));
-    }
-};
+//     for (Code c : other.args) {
+//         args.push_back(Code(c));
+//     }
+// }
+
+//Code::~Code() { if (l) delete l; }
 
 
 vector<string> split(const string &s, char delim) {
@@ -72,7 +74,7 @@ ostream& operator<<(ostream& stream, const Literal& lit) {
     return stream;
 }
 
-ostream& operator<<(ostream& stream, Lambda* l) {
+ostream& operator<<(ostream& stream, Lambda *l) {
     stream << "(λ ";
     for (auto a : l->argnames) stream << a << " ";
     stream << l->body << ")" << endl;
@@ -81,12 +83,12 @@ ostream& operator<<(ostream& stream, Lambda* l) {
 
 ostream& operator<<(ostream& stream, const Code& c) {
     if (c.l) {
-        stream << c.l;
+        stream << *c.l;
     } else if (c.lit.val != "") {
         stream << "(λ " << c.lit << ")";
     }
     stream << "[";
-    for (auto a : c.args) stream << a << ",";
+    for (const auto &a : c.args) stream << a << ",";
     stream << "]";
     return stream;
 }

@@ -33,9 +33,9 @@
     return l;
 }
 
-{- PARSE <> Lambda* <> lambda -}
+{- PARSE <> unique_ptr<Lambda> <> lambda -}
 {
-    Lambda *l = new Lambda;
+    unique_ptr<Lambda> l(new Lambda);
 
     {- SKIP <> "(" -}
 
@@ -62,14 +62,14 @@
 
 {- PARSE <> Code <> argument -}
 {
-    Code c = {};
+    Code c {};
 
     c.src.beg = next(p.tknvals.begin(), (int) p.idx);
 
 //    {- SKIP <> "(" -}
 
     if (NOW == "(") {
-        {- MONAD <> c.l <> Lambda <> lambda -}
+        {- MONAD <> c.l <> unique_ptr<Lambda> <> lambda -}
     } else {
         {- MONAD <> c.lit <> Literal <> literal -}
     }
@@ -85,13 +85,13 @@
 // ( (|x y| x + y) 2 3 )
 {- PARSE <> Code <> code -}
 {
-    Code c = {};
+    Code c {};
     c.src.beg = next(p.tknvals.begin(), p.idx);
 
 //    {- SKIP <> "(" -}
 
     if (NOW == "(") {
-        {- MONAD <> c.l <> Lambda* <> lambda -}
+        {- MONAD <> c.l <> unique_ptr<Lambda> <> lambda -}
     } else {
         {- MONAD <> c.lit <> Literal <> literal -}
     }

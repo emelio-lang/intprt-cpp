@@ -143,15 +143,15 @@ Code replace_code(Code c, const map<string, Code*> &d) {
             }
         }
 
-        replace_code(c.l->body, d);
+        c.l->body = replace_code(c.l->body, d);
     } else if (c.lit.val != "") {
         if (CONTAINS(d, c.lit.val)) {
-            c = *d.at(c.lit.val);
+            c = std::move(*d.at(c.lit.val));
         }
     }
 
     for (auto &a : c.args) {
-        a = replace_code(a, d);
+        a = std::move(replace_code(a, d));
     }
 
     return c;
@@ -211,204 +211,208 @@ inline void apply_notation(Code &code, const Notation& notation) {
     fruit = replace_code(fruit, d);
 }
 
-pair<Code, ReductionFlow> S_reduction(Code code, ReductionFlow rf) {
+pair<Code, ReductionFlow> S_reduction(Code c, ReductionFlow rf) {
+    Code &code = c;
+    
+    while ( true ) {
+        
+        cout << "Reductioning ... " << endl;
+        cout << code << endl;
 
-    cout << "Reductioning ... " << endl;
-    cout << code << endl;
+        // Apply notations
+        for (const auto n : rf.notations) {
+            apply_notation(code, n);
+        }
+
+        if (!code.l) {
+            if (is_literal(code.lit.val)) return make_pair(code,rf);
+            else {
+                if (CONTAINS(rf.bind, code.lit.val)) {
+                    Code *res = ref(code.lit.val);
+                    while (!res->l) {
+                        if (is_literal(res->lit.val)) return make_pair(*res, rf);
+                        res = ref(res->lit.val);
+                    }
+                    code.l = res->l;
+                    code.lit = res->lit;
+                    copy(res->args.begin(), res->args.begin(), back_inserter(code.args));
+                    // Code res = reduction(*rf.bind[code.lit.val], rf).first;
+                    // res.args = code.args;
+                    // rf.bind[code.lit.val] = &res; // NOTE: 結果反映
+                    // c = res;
+                    // TODO: どうすれば...
+                } else if (code.lit.val == "notation") {
+                    // 表記の書き換え
+                    // 書き換え規則を取得して、第三引数のコードをソース情報から書き換える。
+                    // 再度パースしてできたCodeのreductionを今回の結果とする
+                    // NOTE: 実行順序は関係あるの？まとめてやったら？何度もパースしたくないし
+                    if (code.args.size() != 3) {
+                        cout << "[ERROR] notationの引数の数が違います";
+                        return make_pair(make_int_litcode(0), rf); // NOTE: エラー値として
+                    }
 
 
-    for (const auto n : rf.notations) {
-        apply_notation(code, n);
-    }
+                    // TODO: validity check of configuration (splash off something like 'A B ; C')
 
 
-    if (!code.l) {
-        if (is_literal(code.lit.val)) return make_pair(code,rf);
-        else {
-            if (CONTAINS(rf.bind, code.lit.val)) {
-                Code *res = ref(code.lit.val);
-                while (!res->l) {
-                    if (is_literal(res->lit.val)) return make_pair(*res, rf);
-                    res = ref(res->lit.val);
+                    vector<string> to = vector<string>(code.args[1].src.beg, code.args[1].src.end);
+                    rmvparen(to);
+                    Code to_code;
+                    {
+
+                        ParserFlow pf = {to, 0};
+                        to_code = ::code(pf);
+                    }
+
+                    TknvalsRegion conf = code.args[0].src;
+                    rmvparen(conf);
+
+                    rf.notations.push_back(Notation {conf, to_code});
+
+                    return make_pair(S_reduction(code.args[2],rf).first, rf);
+                } else if (code.lit.val == "add") {
+                    code.l = &add;
+                } else if (code.lit.val == "negate") {
+                    code.l = &::negate;
+                } else {
+                    cout << "[ERROR] '" << code.lit.val << "'というような名前は見つかりません" << endl;
                 }
-                code.l = res->l;
-                code.lit = res->lit;
-                copy(res->args.begin(), res->args.begin(), back_inserter(code.args));
-                // Code res = reduction(*rf.bind[code.lit.val], rf).first;
-                // res.args = code.args;
-                // rf.bind[code.lit.val] = &res; // NOTE: 結果反映
-                // c = res;
-                // TODO: どうすれば...
-            } else if (code.lit.val == "notation") {
-                // 表記の書き換え
-                // 書き換え規則を取得して、第三引数のコードをソース情報から書き換える。
-                // 再度パースしてできたCodeのreductionを今回の結果とする
-                // NOTE: 実行順序は関係あるの？まとめてやったら？何度もパースしたくないし
-                if (code.args.size() != 3) {
-                    cout << "[ERROR] notationの引数の数が違います";
-                    return make_pair(make_int_litcode(0), rf); // NOTE: エラー値として
-                }
-
-
-                // TODO: validity check of configuration (splash off something like 'A B ; C')
-
-
-                vector<string> to = vector<string>(code.args[1].src.beg, code.args[1].src.end);
-                rmvparen(to);
-                Code to_code;
-                {
-
-                    ParserFlow pf = {to, 0};
-                    to_code = ::code(pf);
-                }
-
-                TknvalsRegion conf = code.args[0].src;
-                rmvparen(conf);
-
-                rf.notations.push_back(Notation {conf, to_code});
-
-                return make_pair(S_reduction(code.args[2],rf).first, rf);
-            } else if (code.lit.val == "add") {
-                code.l = &add;
-            } else if (code.lit.val == "negate") {
-                code.l = &::negate;
-            } else {
-                cout << "[ERROR] '" << code.lit.val << "'というような名前は見つかりません" << endl;
             }
         }
-    }
 
-    for (int i = code.args.size()-1; i >= 0; i--) {
-        code.args[i] = S_reduction(code.args[i], rf).first;
-        rf.argstack.push(&code.args[i]);
-    }
-
-    for (string argname : code.l->argnames) {
-        Code *arg;
-        if (rf.argstack.empty()) {
-            // TODO: 部分適用 ? 
-            cout << "[ERROR] 引数の数が足りません" << endl;
-            return make_pair(code, rf);
-        } else {
-            arg = rf.argstack.top();
-            rf.argstack.pop();
+        for (int i = code.args.size()-1; i >= 0; i--) {
+            code.args[i] = S_reduction(std::move(code.args[i]), rf).first;
+            rf.argstack.push(&code.args[i]);
         }
 
-        if (CONTAINS(rf.bind, argname)) {
-            rf.shadower[argname] = random_string(16);
-            // TODO: 衝突!
-            rf.bind[rf.shadower[argname]] = arg;
-        } else
-            rf.bind[argname] = arg;
-    }
+        for (string argname : code.l->argnames) {
+            Code *arg;
+            if (rf.argstack.empty()) {
+                // TODO: 部分適用 ? 
+                cout << "[ERROR] 引数の数が足りません" << endl;
+                return make_pair(code, rf);
+            } else {
+                arg = rf.argstack.top();
+                rf.argstack.pop();
+            }
 
-    if (code.lit.val == "add") {
-        pair<int,bool> tmp1 = read_int_litcode(ref("a1"));
-        pair<int,bool> tmp2 = read_int_litcode(ref("a2"));
-            
-        if (tmp1.second && tmp2.second) 
-            return make_pair(make_int_litcode(tmp1.first + tmp2.first), rf);
-        else
-            return make_pair(code, rf);
-    } else if (code.lit.val == "negate") {
-        pair<int,bool> tmp1 = read_int_litcode(ref("a1"));
-            
-        if (tmp1.second) 
-            return make_pair(make_int_litcode(-tmp1.first), rf);
-        else
-            return make_pair(code, rf);
-    }
+            if (CONTAINS(rf.bind, argname)) {
+                rf.shadower[argname] = random_string(16);
+                // TODO: 衝突!
+                rf.bind[rf.shadower[argname]] = arg;
+            } else
+                rf.bind[argname] = arg;
+        }
 
-    if (!code.l->body.l && code.l->body.lit.val == "")
-        return make_pair(code, rf);
-    
-    return make_pair(S_reduction(code.l->body,rf).first, rf);
+        if (code.lit.val == "add") {
+            pair<int,bool> tmp1 = read_int_litcode(ref("a1"));
+            pair<int,bool> tmp2 = read_int_litcode(ref("a2"));
+            
+            if (tmp1.second && tmp2.second) 
+                return make_pair(make_int_litcode(tmp1.first + tmp2.first), rf);
+            else
+                return make_pair(code, rf);
+        } else if (code.lit.val == "negate") {
+            pair<int,bool> tmp1 = read_int_litcode(ref("a1"));
+            
+            if (tmp1.second) 
+                return make_pair(make_int_litcode(-tmp1.first), rf);
+            else
+                return make_pair(code, rf);
+        }
+
+        if (!code.l->body.l && code.l->body.lit.val == "")
+            return make_pair(code, rf);
+
+        code = code.l->body;
+    }
 }
 
 
 
-pair<Code, ReductionFlow> reduction(Code code, ReductionFlow rf) {
+// pair<Code, ReductionFlow> reduction(Code code, ReductionFlow rf) {
 
-    ReductionFlow oldrf = rf;
+//     ReductionFlow oldrf = rf;
 
-    cout << "Reductioning ... " << endl;
-    cout << code << endl;
+//     cout << "Reductioning ... " << endl;
+//     cout << code << endl;
 
-    if (!code.l) {
-        if (is_literal(code.lit.val)) return make_pair(code,rf);
-        else {
-            if (CONTAINS(rf.bind, code.lit.val)) {
-                Code res = *ref(code.lit.val);
-                while (!res.l) {
-                    if (is_literal(res.lit.val)) return make_pair(res, rf);
-                    res = *ref(res.lit.val);
-                }
-                code.l = res.l;
-                code.lit = res.lit;
-                copy(res.args.begin(), res.args.begin(), back_inserter(code.args));
-                // Code res = reduction(*rf.bind[code.lit.val], rf).first;
-                // res.args = code.args;
-                // rf.bind[code.lit.val] = &res; // NOTE: 結果反映
-                // c = res;
-                // TODO: どうすれば...
-            } else if (code.lit.val == "add") {
-                code.l = &add;
-            } else if (code.lit.val == "negate") {
-                code.l = &::negate;
-            } else {
-                cout << "[ERROR] '" << code.lit.val << "'というような名前は見つかりません" << endl;
-            }
-        }
-    }
+//     if (!code.l) {
+//         if (is_literal(code.lit.val)) return make_pair(code,rf);
+//         else {
+//             if (CONTAINS(rf.bind, code.lit.val)) {
+//                 Code res = *ref(code.lit.val);
+//                 while (!res.l) {
+//                     if (is_literal(res.lit.val)) return make_pair(res, rf);
+//                     res = *ref(res.lit.val);
+//                 }
+//                 code.l = res.l;
+//                 code.lit = res.lit;
+//                 copy(res.args.begin(), res.args.begin(), back_inserter(code.args));
+//                 // Code res = reduction(*rf.bind[code.lit.val], rf).first;
+//                 // res.args = code.args;
+//                 // rf.bind[code.lit.val] = &res; // NOTE: 結果反映
+//                 // c = res;
+//                 // TODO: どうすれば...
+//             } else if (code.lit.val == "add") {
+//                 code.l = &add;
+//             } else if (code.lit.val == "negate") {
+//                 code.l = &::negate;
+//             } else {
+//                 cout << "[ERROR] '" << code.lit.val << "'というような名前は見つかりません" << endl;
+//             }
+//         }
+//     }
 
-    for (int i = code.args.size()-1; i >= 0; i--) {
-        rf.argstack.push(&code.args[i]);
-    }
+//     for (int i = code.args.size()-1; i >= 0; i--) {
+//         rf.argstack.push(&code.args[i]);
+//     }
 
-    for (string argname : code.l->argnames) {
-        Code *arg;
-        if (rf.argstack.empty()) {
-            // TODO: 部分適用 ? 
-            cout << "[ERROR] 引数の数が足りません" << endl;
-            return make_pair(code, rf);
-        } else {
-            arg = rf.argstack.top();
-            rf.argstack.pop();
-        }
+//     for (string argname : code.l->argnames) {
+//         Code *arg;
+//         if (rf.argstack.empty()) {
+//             // TODO: 部分適用 ? 
+//             cout << "[ERROR] 引数の数が足りません" << endl;
+//             return make_pair(code, rf);
+//         } else {
+//             arg = rf.argstack.top();
+//             rf.argstack.pop();
+//         }
 
-        // if (CONTAINS(rf.bind, argname)) {
-        //     rf.shadower[argname] = random_string(16);
-        //     // TODO: 衝突!
-        //     rf.bind[rf.shadower[argname]] = arg;
-        // } else
-        rf.bind[argname] = arg;
-    }
+//         // if (CONTAINS(rf.bind, argname)) {
+//         //     rf.shadower[argname] = random_string(16);
+//         //     // TODO: 衝突!
+//         //     rf.bind[rf.shadower[argname]] = arg;
+//         // } else
+//         rf.bind[argname] = arg;
+//     }
 
-    if (code.lit.val == "add") {
-        Code a1 = reduction(*ref("a1"),rf).first;
-        Code a2 = reduction(*ref("a2"),rf).first;
-        pair<int,bool> tmp1 = read_int_litcode(a1);
-        pair<int,bool> tmp2 = read_int_litcode(a2);
+//     if (code.lit.val == "add") {
+//         Code a1 = reduction(*ref("a1"),rf).first;
+//         Code a2 = reduction(*ref("a2"),rf).first;
+//         pair<int,bool> tmp1 = read_int_litcode(a1);
+//         pair<int,bool> tmp2 = read_int_litcode(a2);
             
-        if (tmp1.second && tmp2.second) 
-            return make_pair(make_int_litcode(tmp1.first + tmp2.first), rf);
-        else
-            return make_pair(Code (&add, Literal{"add"}, code.args), rf); // NOTE: ここのliteralを入れておくことでbodyが無いことを示せる
-    } else if (code.lit.val == "negate") {
-        Code a1 = reduction(*ref("a1"),rf).first;
-        pair<int,bool> tmp1 = read_int_litcode(a1);
+//         if (tmp1.second && tmp2.second) 
+//             return make_pair(make_int_litcode(tmp1.first + tmp2.first), rf);
+//         else
+//             return make_pair(Code (&add, Literal{"add"}, code.args), rf); // NOTE: ここのliteralを入れておくことでbodyが無いことを示せる
+//     } else if (code.lit.val == "negate") {
+//         Code a1 = reduction(*ref("a1"),rf).first;
+//         pair<int,bool> tmp1 = read_int_litcode(a1);
             
-        if (tmp1.second) 
-            return make_pair(make_int_litcode(-tmp1.first), rf);
-        else
-            return make_pair(Code (&::negate, Literal{"negate"}, code.args), rf);
-    }
+//         if (tmp1.second) 
+//             return make_pair(make_int_litcode(-tmp1.first), rf);
+//         else
+//             return make_pair(Code (&::negate, Literal{"negate"}, code.args), rf);
+//     }
 
-    if (!code.l->body.l && code.l->body.lit.val == "")
-        return make_pair(code, rf);
+//     if (!code.l->body.l && code.l->body.lit.val == "")
+//         return make_pair(code, rf);
     
-    return make_pair(reduction(code.l->body,rf).first, rf);
-}
+//     return make_pair(reduction(code.l->body,rf).first, rf);
+// }
+
 
 
 Code reduction(Code code, bool silent) {

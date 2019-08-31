@@ -9,6 +9,7 @@
    ======================================================================== */
 
 #include <iterator>
+#include <memory>
 #include <algorithm>
 #include <cctype>
 #include <numeric>
@@ -55,31 +56,34 @@ struct TknvalsRegion {
 };
 
 struct Code {
-    Lambda *l;
+    unique_ptr<Lambda> l = nullptr;
     Literal lit;
     vector<Code> args;
 
     // NOTE: tknvalsは変更されないことを想定しています
     TknvalsRegion src;
 
-    Code(const Code& other);
+//    Code(const Code& other);
+//    ~Code();
 
     Code(Code&& o) noexcept {
-        l = o.l;
+        l = std::move(o.l);
         lit = o.lit;
-        args = o.args;
+        args = std::move(o.args);
         src = o.src;
     };
 
     Code(Lambda *li, Literal liti, vector<Code> argsi = {}, TknvalsRegion srci = {}) :
-            l(li), lit(liti), args(argsi), src(srci) {};
+            l(li), lit(liti), args(std::move(argsi)), src(srci) {};
     Code() = default;
-    Code& operator=(const Code&) = default;
+    Code& operator=(Code&&) = default;
+//    Code& operator=(const Code&) = default;
+    // TODO: copy method
 };
 
 struct Lambda {
-    vector<string> argnames;
-    Code body = {};
+    vector<string> argnames {};
+    Code body {};
 };
 
 Code code(ParserFlow& p);
