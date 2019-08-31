@@ -7,10 +7,27 @@
    ======================================================================== */
 
 #include "emelio.h"
+#include "util.h"
 
 #include <cctype>
 #include <locale>
 #include <sstream>
+
+
+Code::Code(const Code& other) {
+    lit = other.lit;
+    src = other.src;
+    
+    if (other.l) {
+        l = new Lambda;
+        *l = *other.l;
+    }
+
+    for (Code c : other.args) {
+        args.push_back(Code(c));
+    }
+};
+
 
 vector<string> split(const string &s, char delim) {
     vector<string> elems;

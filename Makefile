@@ -27,8 +27,8 @@ OBJS = tkutil.o tk.o util.o parse.o reduction.o emelio.o
 clean: 
 	rm *.cpp.cc
 
-build: $(OBJS)
-	g++ -o emelio $(OBJS)
+build: $(OBJS) emelio.h
+	g++ -o emelio $(OBJS) -g3
 
 clang: $(OBJS)
 	clang -std=c++17 -o emelio $(OBJS)

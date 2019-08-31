@@ -27,35 +27,11 @@
 #define REFEQUAL(a,b) (&(a) == &(b))
 #define INDEXOF(c,v) (distance((c).begin(), find((c).begin(), (c).end(), v)))
 
-vector<string> split(const string &s, char delim);
-    
-template<typename Char, typename Traits, typename Allocator>
-std::basic_string<Char, Traits, Allocator> operator *
-(const std::basic_string<Char, Traits, Allocator> s, size_t n);
-
-template<typename Char, typename Traits, typename Allocator>
-std::basic_string<Char, Traits, Allocator> operator *
-(size_t n, const std::basic_string<Char, Traits, Allocator>& s);
-
-bool is_number(const std::string& s);
-bool is_literal(const std::string& s);
+#define internal_global static
+#define persistent static
 
 #define ARG(x) const x&
 #define MUT_ARG(x) x&
-
-// struct L;
-
-// typedef string Lp;
-
-// struct L {
-//     Lp body;
-//     map<string,Lp> argbind = {};
-// };
-
-// struct ProgramData {
-//     L root;
-//     map<string, L> bind;
-// };
 
 
 struct ParserFlow {
@@ -70,42 +46,45 @@ struct Literal {
     string val;
 };
 
+struct TknvalsRegion {
+    vector<string>::iterator beg, end;
+
+    size_t size() const {
+        return distance(this->beg, this->end);
+    }
+};
+
 struct Code {
     Lambda *l;
     Literal lit;
     vector<Code> args;
 
     // NOTE: tknvalsは変更されないことを想定しています
-    vector<string>::iterator srcbeg, srcend;
+    TknvalsRegion src;
+
+    Code(const Code& other);
+
+    Code(Code&& o) noexcept {
+        l = o.l;
+        lit = o.lit;
+        args = o.args;
+        src = o.src;
+    };
+
+    Code(Lambda *li, Literal liti, vector<Code> argsi = {}, TknvalsRegion srci = {}) :
+            l(li), lit(liti), args(argsi), src(srci) {};
+    Code() = default;
+    Code& operator=(const Code&) = default;
 };
 
 struct Lambda {
     vector<string> argnames;
-    Code body;
+    Code body = {};
 };
-
-
-extern int lctn_idx;
-extern array<Lambda, 10000> lctn;
-
-
 
 Code code(ParserFlow& p);
 //pair<ProgramData,int> parse(ARG(vector<string>) tknvals, int initial_idx = 0, string basename = "");
 Code reduction(Code code, bool silent = false);
-
-std::string random_string( size_t length );
-std::string random_sane_string( size_t length );
-std::string random_saneupper_string( size_t length );
-bool is_all_upper(string &s);
-
-
-
-ostream& operator<<(ostream& stream, const Literal&);
-ostream& operator<<(ostream& stream, const Code&);
-ostream& operator<<(ostream& stream, const Lambda&);
-ostream& operator<<(ostream& stream, Lambda*);
-
 
 
 #define EMELIO_H 1

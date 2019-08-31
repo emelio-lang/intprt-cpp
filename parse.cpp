@@ -7,6 +7,7 @@
    ======================================================================== */
 
 #include "emelio.h"
+#include "util.h"
 
 #define NOW p.tknvals[p.idx]
 #define PASER(type, name)
@@ -23,10 +24,6 @@
 {!SKIP <> s <> if (p.tknvals[p.idx] == #s) p.idx++; else cout << "Excepts " << #s << " but " << p.tknvals[p.idx] << endl; !}
 {!PARSE <> type <> name <> #type #name(ParserFlow& p) !}
 
-int lctn_idx = 0;
-array<Lambda, 10000> lctn;
-
-
 {- PARSE <> Literal <> literal -}
 {
     Literal l;
@@ -38,7 +35,7 @@ array<Lambda, 10000> lctn;
 
 {- PARSE <> Lambda* <> lambda -}
 {
-    Lambda l;
+    Lambda *l = new Lambda;
 
     {- SKIP <> "(" -}
 
@@ -51,38 +48,35 @@ array<Lambda, 10000> lctn;
                 {- SKIP <> "|" -}
                 break;
             } else {
-                l.argnames.push_back(NOW);
+                l->argnames.push_back(NOW);
             }
         }
     }
 
-    {- MONAD <> l.body <> Code <> code -}
+    {- MONAD <> l->body <> Code <> code -}
 
     {- SKIP <> ")" -}
 
-    lctn[lctn_idx] = l;
-    lctn_idx++;
-    
-    return &lctn[lctn_idx-1];
+    return l;
 }
 
 {- PARSE <> Code <> argument -}
 {
     Code c = {};
 
-    c.srcbeg = next(p.tknvals.begin(), (int) p.idx);
+    c.src.beg = next(p.tknvals.begin(), (int) p.idx);
 
 //    {- SKIP <> "(" -}
 
     if (NOW == "(") {
-        {- MONAD <> c.l <> Lambda* <> lambda -}
+        {- MONAD <> c.l <> Lambda <> lambda -}
     } else {
         {- MONAD <> c.lit <> Literal <> literal -}
     }
 
 //    {- SKIP <> ")" -}
 
-    c.srcend = next(p.tknvals.begin(), p.idx);
+    c.src.end = next(p.tknvals.begin(), p.idx);
     
     return c;
 }
@@ -92,7 +86,7 @@ array<Lambda, 10000> lctn;
 {- PARSE <> Code <> code -}
 {
     Code c = {};
-    c.srcbeg = next(p.tknvals.begin(), p.idx);
+    c.src.beg = next(p.tknvals.begin(), p.idx);
 
 //    {- SKIP <> "(" -}
 
@@ -112,7 +106,7 @@ array<Lambda, 10000> lctn;
 
 
 //    {- SKIP <> ")" -}
-    c.srcend = next(p.tknvals.begin(), p.idx);
+    c.src.end = next(p.tknvals.begin(), p.idx);
 
     return c;
 }

@@ -1,7 +1,7 @@
-(notation (A $ B) (A (B)) (
-(notation (let A = B ; C) ((|A| C) (B)) (
-(notation (A ; B) ((|x| B) (A)) (
-    let c = add 2 3;
+(notation (As $ Bs) (As (Bs)) (
+(notation (let A = Bs ; Cs) ((|A| Cs) (Bs)) (
+(notation (As ; Bs) ((|x| Bs) (As)) (
+    let c = (|x y| add x y) 2 (negate 3);
     add 3 2;
     add 2 c
 ))

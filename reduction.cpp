@@ -7,12 +7,18 @@
    ======================================================================== */
 
 #include "emelio.h"
+#include "util.h"
 
-{! BUILTIN_1 <> name <> Lambda #name = { { "a1" }, {} }; Code c_#name = { &::#name, "#name", {} }; !}
-{! BUILTIN_2 <> name <> Lambda #name = { { "a1", "a2" }, {} }; Code c_#name = { &::#name, "#name", {} }; !}
+{! BUILTIN_1 <> name <> Lambda #name = { { "a1" }, {} }; Code c_#name (&::#name, Literal {"#name"}, vector<Code> {}, TknvalsRegion {}); !}
+{! BUILTIN_2 <> name <> Lambda #name = { { "a1", "a2" }, {} }; Code c_#name (&::#name, Literal {"#name"}, vector<Code> {}, TknvalsRegion {}); !}
 
 {- BUILTIN_1 <> negate -}
 {- BUILTIN_2 <> add -}
+
+struct Notation {
+    TknvalsRegion config;
+    Code to;
+};
 
 struct ReductionFlow {
     map<string, Code*> bind = {
@@ -22,10 +28,7 @@ struct ReductionFlow {
     stack<Code*> argstack;
     // NOTE: 未計算のままshadowingするために必要
     map<string, string> shadower;
-};
-
-struct TknvalsRegion {
-    vector<string>::iterator beg, end;
+    vector<Notation> notations;
 };
 
 
@@ -51,6 +54,12 @@ static inline void rmvparen(std::vector<string> &v) {
 
     if (v.front() == "(") v.erase(v.begin());
     if (v.back() == ")") v.pop_back();
+}
+static inline void rmvparen(TknvalsRegion &r) {
+    if (distance(r.beg, r.end) == 0) return;
+
+    if (*r.beg == "(") r.beg++;
+    if (*r.end == ")") r.end--;
 }
 
 
@@ -81,7 +90,7 @@ pair<int,bool> read_int_litcode(const Code& c) {
 }
 
 Code make_int_litcode(int n) {
-    return Code { 0, Literal { to_string(n) }, {} };
+    return Code (0, Literal { to_string(n) });
 }
 
 Code *ref(string name, ReductionFlow &rf) {
@@ -101,55 +110,6 @@ Code *ref(string name, ReductionFlow &rf) {
 }
 #define ref(a) ref(a,rf)
 
-void forward_replace(vector<string>& pre_fruit, const vector<string>& config, const vector<string>& to) {
-    while (true) {
-        map<string, TknvalsRegion> matches;
-        int c = 0;
-        bool done = true;
-
-        for (auto itr = pre_fruit.begin();
-             itr != pre_fruit.end();
-             ++itr)
-        {
-            if (itr == pre_fruit.begin() || itr == prev(pre_fruit.end())) continue;
-
-            if (!CONTAINS(matches, config[c]))
-                matches[config[c]] = TknvalsRegion { itr, next(itr) };
-                        
-            if (c+1 < config.size() && config[c+1] == *itr) {
-                matches[config[c+1]] = TknvalsRegion { itr, next(itr) };
-                                
-                done = false;
-                matches[config[c]].end = itr;
-                c++; itr++;
-                while (config[c] == *itr) {
-                    matches[config[c]] = TknvalsRegion { itr, next(itr) };
-                    c++; itr++;
-                }
-                c++;
-                itr--;
-            }
-        }
-
-        matches[config.back()].end = prev(pre_fruit.end());
-
-        if (done) break;
-
-        vector<string> new_pre_fruit = {};
-        for (string t : to) {
-            if (is_all_upper(t)) {
-                copy(matches[t].beg, matches[t].end, back_inserter(new_pre_fruit));
-            } else {
-                new_pre_fruit.push_back(t);
-            }
-        }
-
-        pre_fruit = new_pre_fruit;
-                    
-        done = true;
-    }
-}
-
 inline bool is_notation_variable(const string& s) {
     bool res = true;
     for (char c : s) if (!isupper(c)) res = false;
@@ -160,41 +120,10 @@ inline bool is_notation_free_variable(const string& s) {
     bool res = true;
     for (int i = 0; i < s.size()-1; ++i)
         if (!isupper(s[i])) res = false;
-    if (s.back() != '?') res = false;
+    if (s.back() != 's') res = false;
     return res;
 }
 
-void
-replace(vector<vector<string>> &matches,
-        const vector<string>& config, 
-        const vector<string>& to
-        )
-// TODO: nvが重複している可能性は...?    
-{
-    vector<string> res = {};
-
-    int i = 0;
-    for (string notvar : to) {
-        if (is_notation_variable(notvar)) {
-            // NOTE: ここではエラーおきないはず
-            copy(
-                matches[INDEXOF(config, notvar)].begin(),
-                matches[INDEXOF(config, notvar)].end(),
-                back_inserter(res));
-        } else {
-            res.push_back(notvar);
-        }
-        
-        i++;
-    }
-
-    matches.erase(matches.begin(), matches.begin() + config.size()-1);
-    matches[0] = res;
-
-    if (matches.size() == 1) return;
-
-    replace(matches, config, to);
-}
 
 // NOTE: 左右に変数がない場合、適当な文字を入れ込みます
 void pad_notation_config(vector<string>& config) {
@@ -206,92 +135,105 @@ void pad_notation_config(vector<string>& config) {
     }
 }
 
-
-void match(
-    vector<vector<string>> &res,
-    const vector<string>& base,
-    const vector<string>& config,
-    pair<string,int> exit_token = "",
-    bool forward = true)
-{
-    if (exit_token.first == "") {
-        int i = 0;
-        for (auto c : config) {
-            if (!is_notation_variable(c)) {
-                exit_token = make_pair(c, i);
-                break;
+Code replace_code(Code c, const map<string, Code*> &d) {
+    if (c.l) {
+        for (string &a : c.l->argnames) {
+            if (CONTAINS(d, a)) {
+                a = d.at(a)->lit.val; // ?
             }
-            i++;
+        }
+
+        replace_code(c.l->body, d);
+    } else if (c.lit.val != "") {
+        if (CONTAINS(d, c.lit.val)) {
+            c = *d.at(c.lit.val);
         }
     }
 
-    if (forward) {
-        vector<string> buf;
-        int c = 0;
-        for (int i = 0; i < base.size(); ++i) {
-            if (base[i] == exit_token.first && i-exit_token.second <= 0) {
-                for (int j = 0; j < exit_token.second; ++j)
-                    res.push_back(base[j]);
-                res.push_back(base[i]);
-            }
-            
-            if (c+1 < config.size() && base[i] == config[c+1]) {
-                res.push_back(buf);
-                buf.clear();
-                // TODO: 特殊文字が複数回連続する
-                res.push_back({base[i]});
-                c += 2;
-            }
-            else {
-                buf.push_back(base[i]);
-            }
-
-            if (i == base.size()-1) {
-                if (find(buf.begin(), buf.end(), exit_token) != buf.end()) {
-                    match(res, buf, config, exit_token, forward);
-                } else {
-                    res.push_back(buf);
-                }
-            }
-        }
+    for (auto &a : c.args) {
+        a = replace_code(a, d);
     }
+
+    return c;
 }
 
 
+inline void apply_notation(Code &code, const Notation& notation) {
+    // first, check length
+    if (code.args.size()+1 < notation.config.size())
+        return;
 
 
-// void backward_replace(vector<string>& pre_fruit, vector<string>& config, vector<string>& to) {
-//     pre_fruit = reverse(pre_fruit.begin(), pre_fruit.end());
-//     config = reverse(config.begin(), config.end());
+    vector<Code> tmps;
+    map<string, Code*> d;
+    if (!is_notation_variable(*notation.config.beg) && code.lit.val != *notation.config.beg) return;
+    d.insert(make_pair(*notation.config.beg, &code));
 
 
-//     forward_replace(pre_fruit, config, to);
+    int i = 0;
+    for (auto i_notval = next(notation.config.beg);
+         i_notval != notation.config.end;
+         i_notval++)
+    {
+        // NOTE: 大きさのチェックは最初にしたのでこのときのみがチェック対象
+        if (i >= code.args.size()) break;
 
+        // free variable
+        // 文字列を集めてパースただし、関数が潜んでいた場合... = add (f 3) 2;とか
+        if (is_notation_free_variable(*i_notval)) {
+            int start = i;
+            tmps.push_back(code.args[i]);
+            i++;
+            while (true) {
+                if (i >= code.args.size()
+                    || 
+                    code.args[i].lit.val == *next(i_notval))
+                {
+                    d.insert(make_pair(*i_notval, &tmps[tmps.size()-1]));
+                    i--;
+                    break;
+                }
 
-// }
+                tmps[tmps.size()-1].args.push_back(code.args[i]);
+                tmps[tmps.size()-1].src.end = code.args[i].src.end;
+                
+                i++;
+            }
+        } else {
+            if (!is_notation_variable(*i_notval) && code.args[i].lit.val != *i_notval) return;
+            d.insert(make_pair(*i_notval, &code.args[i]));
+        }
+        i++;
+    }
 
+    Code fruit = notation.to;
 
-
+    fruit = replace_code(fruit, d);
+}
 
 pair<Code, ReductionFlow> S_reduction(Code code, ReductionFlow rf) {
 
-
     cout << "Reductioning ... " << endl;
     cout << code << endl;
+
+
+    for (const auto n : rf.notations) {
+        apply_notation(code, n);
+    }
 
 
     if (!code.l) {
         if (is_literal(code.lit.val)) return make_pair(code,rf);
         else {
             if (CONTAINS(rf.bind, code.lit.val)) {
-                Code res = *ref(code.lit.val);
-                while (!res.l) {
-                    if (is_literal(res.lit.val)) return make_pair(res, rf);
-                    res = *ref(res.lit.val);
+                Code *res = ref(code.lit.val);
+                while (!res->l) {
+                    if (is_literal(res->lit.val)) return make_pair(*res, rf);
+                    res = ref(res->lit.val);
                 }
-                code.l = res.l;
-                code.lit = res.lit;
-                copy(res.args.begin(), res.args.begin(), back_inserter(code.args));
+                code.l = res->l;
+                code.lit = res->lit;
+                copy(res->args.begin(), res->args.begin(), back_inserter(code.args));
                 // Code res = reduction(*rf.bind[code.lit.val], rf).first;
                 // res.args = code.args;
                 // rf.bind[code.lit.val] = &res; // NOTE: 結果反映
@@ -308,41 +250,24 @@ pair<Code, ReductionFlow> S_reduction(Code code, ReductionFlow rf) {
                 }
 
 
-                vector<string> config = vector<string>(code.args[0].srcbeg, code.args[0].srcend);
-                rmvparen(config); // NOTE: (とか)は受け付けないのでn
-
-
                 // TODO: validity check of configuration (splash off something like 'A B ; C')
 
 
-                vector<string> to = vector<string>(code.args[1].srcbeg, code.args[1].srcend);
-                //                rmvparen(to);
-                // Code to_code;
-                // {
+                vector<string> to = vector<string>(code.args[1].src.beg, code.args[1].src.end);
+                rmvparen(to);
+                Code to_code;
+                {
 
-                //     ParserFlow pf = {to, 0};
-                //     to_code = ::code(pf);
-                // }
-
-                vector<string> codestr = vector<string>(code.args[2].srcbeg, code.args[2].srcend);
-                rmvparen(codestr);
-
-
-                // matching...
-                vector<vector<string>> matches;
-                pad_notation_config(config);
-                match(matches, codestr, config, "");
-                if (matches.size() >= config.size()) {
-                    replace(matches, config, to);
-
-                    // re-parse pre_fruit
-                    ParserFlow pf = {matches[0], 0};
-                    Code fruit = ::code(pf);
-                
-                    return make_pair(S_reduction(fruit, rf).first, rf);
-                } else {
-                    code = code.args[2].l->body;
+                    ParserFlow pf = {to, 0};
+                    to_code = ::code(pf);
                 }
+
+                TknvalsRegion conf = code.args[0].src;
+                rmvparen(conf);
+
+                rf.notations.push_back(Notation {conf, to_code});
+
+                return make_pair(S_reduction(code.args[2],rf).first, rf);
             } else if (code.lit.val == "add") {
                 code.l = &add;
             } else if (code.lit.val == "negate") {
@@ -468,7 +393,7 @@ pair<Code, ReductionFlow> reduction(Code code, ReductionFlow rf) {
         if (tmp1.second && tmp2.second) 
             return make_pair(make_int_litcode(tmp1.first + tmp2.first), rf);
         else
-            return make_pair(Code {&add, "add", code.args}, rf); // NOTE: ここのliteralを入れておくことでbodyが無いことを示せる
+            return make_pair(Code (&add, Literal{"add"}, code.args), rf); // NOTE: ここのliteralを入れておくことでbodyが無いことを示せる
     } else if (code.lit.val == "negate") {
         Code a1 = reduction(*ref("a1"),rf).first;
         pair<int,bool> tmp1 = read_int_litcode(a1);
@@ -476,7 +401,7 @@ pair<Code, ReductionFlow> reduction(Code code, ReductionFlow rf) {
         if (tmp1.second) 
             return make_pair(make_int_litcode(-tmp1.first), rf);
         else
-            return make_pair(Code {&::negate, "negate", code.args}, rf);
+            return make_pair(Code (&::negate, Literal{"negate"}, code.args), rf);
     }
 
     if (!code.l->body.l && code.l->body.lit.val == "")
