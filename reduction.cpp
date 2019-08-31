@@ -9,8 +9,8 @@
 #include "emelio.h"
 #include "util.h"
 
-{! BUILTIN_1 <> name <> Lambda #name = { { "a1" }, {} }; Code c_#name (&::#name, Literal {"#name"}, vector<Code> {}, TknvalsRegion {}); !}
-{! BUILTIN_2 <> name <> Lambda #name = { { "a1", "a2" }, {} }; Code c_#name (&::#name, Literal {"#name"}, vector<Code> {}, TknvalsRegion {}); !}
+{! BUILTIN_1 <> name <> shared_ptr<Lambda> #name_p = std::make_shared<Lambda>(Lambda { {"a1"}, {} }); Code c_#name {#name_p, Literal {"#name"}, vector<Code> {}, TknvalsRegion {}}; !}
+{! BUILTIN_2 <> name <> shared_ptr<Lambda> #name_p = std::make_shared<Lambda>(Lambda { {"a1", "a2"}, {} }); Code c_#name {#name_p, Literal {"#name"}, vector<Code> {}, TknvalsRegion {}}; !}
 
 {- BUILTIN_1 <> negate -}
 {- BUILTIN_2 <> add -}
@@ -90,7 +90,7 @@ pair<int,bool> read_int_litcode(const Code& c) {
 }
 
 Code make_int_litcode(int n) {
-    return Code (0, Literal { to_string(n) });
+    return Code {0, Literal { to_string(n) }};
 }
 
 Code *ref(string name, ReductionFlow &rf) {
@@ -146,12 +146,12 @@ Code replace_code(Code c, const map<string, Code*> &d) {
         c.l->body = replace_code(c.l->body, d);
     } else if (c.lit.val != "") {
         if (CONTAINS(d, c.lit.val)) {
-            c = std::move(*d.at(c.lit.val));
+            c = *d.at(c.lit.val);
         }
     }
 
     for (auto &a : c.args) {
-        a = std::move(replace_code(a, d));
+        a = replace_code(a, d);
     }
 
     return c;
@@ -206,13 +206,14 @@ inline void apply_notation(Code &code, const Notation& notation) {
         i++;
     }
 
-    Code fruit = notation.to;
+    Code fruit;
+    fruit.deep_copy_from(notation.to);
 
     fruit = replace_code(fruit, d);
 }
 
 pair<Code, ReductionFlow> S_reduction(Code c, ReductionFlow rf) {
-    Code &code = c;
+    Code code = c;
     
     while ( true ) {
         
@@ -220,22 +221,23 @@ pair<Code, ReductionFlow> S_reduction(Code c, ReductionFlow rf) {
         cout << code << endl;
 
         // Apply notations
-        for (const auto n : rf.notations) {
-            apply_notation(code, n);
-        }
+        // for (const auto n : rf.notations) {
+        //     apply_notation(code, n);
+        // }
 
         if (!code.l) {
             if (is_literal(code.lit.val)) return make_pair(code,rf);
             else {
                 if (CONTAINS(rf.bind, code.lit.val)) {
-                    Code *res = ref(code.lit.val);
-                    while (!res->l) {
-                        if (is_literal(res->lit.val)) return make_pair(*res, rf);
-                        res = ref(res->lit.val);
+                    // NOTE: while内refでの代入時にちゃんと切り替わるため
+                    Code res = *ref(code.lit.val);
+                    while (!res.l) {
+                        if (is_literal(res.lit.val)) return make_pair(res, rf);
+                        res = *ref(res.lit.val);
                     }
-                    code.l = res->l;
-                    code.lit = res->lit;
-                    copy(res->args.begin(), res->args.begin(), back_inserter(code.args));
+                    code.l = res.l;
+                    code.lit = res.lit;
+                    copy(res.args.begin(), res.args.begin(), back_inserter(code.args)); //?
                     // Code res = reduction(*rf.bind[code.lit.val], rf).first;
                     // res.args = code.args;
                     // rf.bind[code.lit.val] = &res; // NOTE: 結果反映
@@ -271,9 +273,9 @@ pair<Code, ReductionFlow> S_reduction(Code c, ReductionFlow rf) {
 
                     return make_pair(S_reduction(code.args[2],rf).first, rf);
                 } else if (code.lit.val == "add") {
-                    code.l = &add;
+                    code.l.reset(add_p.get());
                 } else if (code.lit.val == "negate") {
-                    code.l = &::negate;
+                    code.l.reset(negate_p.get());
                 } else {
                     cout << "[ERROR] '" << code.lit.val << "'というような名前は見つかりません" << endl;
                 }
@@ -281,7 +283,7 @@ pair<Code, ReductionFlow> S_reduction(Code c, ReductionFlow rf) {
         }
 
         for (int i = code.args.size()-1; i >= 0; i--) {
-            code.args[i] = S_reduction(std::move(code.args[i]), rf).first;
+            code.args[i] = S_reduction(code.args[i], rf).first;
             rf.argstack.push(&code.args[i]);
         }
 
@@ -296,11 +298,11 @@ pair<Code, ReductionFlow> S_reduction(Code c, ReductionFlow rf) {
                 rf.argstack.pop();
             }
 
-            if (CONTAINS(rf.bind, argname)) {
-                rf.shadower[argname] = random_string(16);
-                // TODO: 衝突!
-                rf.bind[rf.shadower[argname]] = arg;
-            } else
+            // if (CONTAINS(rf.bind, argname)) {
+            //     rf.shadower[argname] = random_string(16);
+            //     // TODO: 衝突!
+            //     rf.bind[rf.shadower[argname]] = arg;
+            // } else
                 rf.bind[argname] = arg;
         }
 

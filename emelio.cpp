@@ -2,23 +2,6 @@
 #include "emelio.h"
 #include "util.h"
 
-
-
-bool is_number(const std::string& s)
-{
-    int a;
-    try {
-        int a = stoi(s);
-    } catch (invalid_argument& e) {
-        return false;
-    }
-    return true;
-}
-
-bool is_literal(const std::string& s) {
-    return is_number(s);
-}
-
 int main(int argc, char **argv) {
     Tokenizer tkn;
     tkn.preset("cpp");

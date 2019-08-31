@@ -11,17 +11,18 @@ tkutil.o: Tokenizer/util.cpp
 	g++ -c $< -g3 -o $@
 tk.o: Tokenizer/tokenizer.cpp
 	g++ -c $< -g3 -o $@
-util.o: util.cpp
+util.o: util.cpp emelio.h util.h
 	g++ -c $< -g3 -o $@
-reduction.o: reduction.cpp.cc
+reduction.o: reduction.cpp.cc emelio.h util.h
 	g++ -c $< -g3 -o $@
-parse.o: parse.cpp.cc
+parse.o: parse.cpp.cc emelio.h util.h
 	g++ -c $< -g3 -o $@
-emelio.o: emelio.cpp
+emelio.o: emelio.cpp emelio.h util.h
 	g++ -c $< -g3 -o $@
 
 
 OBJS = tkutil.o tk.o util.o parse.o reduction.o emelio.o
+SML_OBJS = tkutil.o tk.o  util.o parse.o emelio.o
 
 
 clean: 
@@ -29,6 +30,10 @@ clean:
 
 build: $(OBJS) emelio.h
 	g++ -o emelio $(OBJS) -g3
+
+sml-build: $(SML_OBJS) emelio.h
+	g++ -o emelio $(SML_OBJS) -g3
+
 
 clang: $(OBJS)
 	clang -std=c++17 -o emelio $(OBJS)

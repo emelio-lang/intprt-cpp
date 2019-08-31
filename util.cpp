@@ -14,6 +14,9 @@
 #include <sstream>
 
 
+
+
+
 // Code::Code(const Code& other) {
 //     lit = other.lit;
 //     src = other.src;
@@ -21,6 +24,8 @@
 //     if (other.l) {
 //         l = unique_ptr<Lambda>(new Lambda);
 //         *l = *other.l;
+//     } else {
+//         l = unique_ptr<Lambda>(nullptr);
 //     }
 
 //     for (Code c : other.args) {
@@ -28,7 +33,39 @@
 //     }
 // }
 
+void Code::deep_copy_from(const Code& other) {
+    lit = other.lit;
+    src = other.src;
+    
+    if (other.l) {
+        l = unique_ptr<Lambda>(new Lambda);
+        *l = *other.l;
+    } else {
+        l = unique_ptr<Lambda>(nullptr);
+    }
+
+    for (Code c : other.args) {
+        args.push_back(Code(c));
+    }
+}
+
 //Code::~Code() { if (l) delete l; }
+
+
+bool is_number(const std::string& s)
+{
+    int a;
+    try {
+        int a = stoi(s);
+    } catch (invalid_argument& e) {
+        return false;
+    }
+    return true;
+}
+
+bool is_literal(const std::string& s) {
+    return is_number(s);
+}
 
 
 vector<string> split(const string &s, char delim) {

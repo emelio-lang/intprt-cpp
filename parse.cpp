@@ -33,9 +33,9 @@
     return l;
 }
 
-{- PARSE <> unique_ptr<Lambda> <> lambda -}
+{- PARSE <> shared_ptr<Lambda> <> lambda -}
 {
-    unique_ptr<Lambda> l(new Lambda);
+    shared_ptr<Lambda> l(new Lambda);
 
     {- SKIP <> "(" -}
 
@@ -69,7 +69,7 @@
 //    {- SKIP <> "(" -}
 
     if (NOW == "(") {
-        {- MONAD <> c.l <> unique_ptr<Lambda> <> lambda -}
+        {- MONAD <> c.l <> shared_ptr<Lambda> <> lambda -}
     } else {
         {- MONAD <> c.lit <> Literal <> literal -}
     }
@@ -91,7 +91,7 @@
 //    {- SKIP <> "(" -}
 
     if (NOW == "(") {
-        {- MONAD <> c.l <> unique_ptr<Lambda> <> lambda -}
+        {- MONAD <> c.l <> shared_ptr<Lambda> <> lambda -}
     } else {
         {- MONAD <> c.lit <> Literal <> literal -}
     }

@@ -56,34 +56,19 @@ struct TknvalsRegion {
 };
 
 struct Code {
-    unique_ptr<Lambda> l = nullptr;
+    shared_ptr<Lambda> l;
     Literal lit;
     vector<Code> args;
 
     // NOTE: tknvalsは変更されないことを想定しています
     TknvalsRegion src;
 
-//    Code(const Code& other);
-//    ~Code();
-
-    Code(Code&& o) noexcept {
-        l = std::move(o.l);
-        lit = o.lit;
-        args = std::move(o.args);
-        src = o.src;
-    };
-
-    Code(Lambda *li, Literal liti, vector<Code> argsi = {}, TknvalsRegion srci = {}) :
-            l(li), lit(liti), args(std::move(argsi)), src(srci) {};
-    Code() = default;
-    Code& operator=(Code&&) = default;
-//    Code& operator=(const Code&) = default;
-    // TODO: copy method
+    void deep_copy_from(const Code& other);
 };
 
 struct Lambda {
     vector<string> argnames {};
-    Code body {};
+    Code body;
 };
 
 Code code(ParserFlow& p);
