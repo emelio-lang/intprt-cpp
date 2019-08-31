@@ -1,1 +1,1 @@
-(|x y| add x y) 2 3
+(|x| add x 2) 3

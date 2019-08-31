@@ -38,14 +38,14 @@ void Code::deep_copy_from(const Code& other) {
     src = other.src;
     
     if (other.l) {
-        l = unique_ptr<Lambda>(new Lambda);
+        l = shared_ptr<Lambda>(new Lambda);
         *l = *other.l;
     } else {
-        l = unique_ptr<Lambda>(nullptr);
+        l = shared_ptr<Lambda>(nullptr);
     }
 
-    for (Code c : other.args) {
-        args.push_back(Code(c));
+    for (const shared_ptr<Code> &c : other.args) {
+        args.push_back(make_shared<Code>(*c));
     }
 }
 
@@ -125,7 +125,7 @@ ostream& operator<<(ostream& stream, const Code& c) {
         stream << "(λ " << c.lit << ")";
     }
     stream << "[";
-    for (const auto &a : c.args) stream << a << ",";
+    for (const auto &a : c.args) stream << *a << ",";
     stream << "]";
     return stream;
 }

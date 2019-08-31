@@ -60,23 +60,23 @@
     return l;
 }
 
-{- PARSE <> Code <> argument -}
+{- PARSE <> unique_ptr<Code> <> argument -}
 {
-    Code c {};
+    unique_ptr<Code> c (new Code);
 
-    c.src.beg = next(p.tknvals.begin(), (int) p.idx);
+    c->src.beg = next(p.tknvals.begin(), (int) p.idx);
 
 //    {- SKIP <> "(" -}
 
     if (NOW == "(") {
-        {- MONAD <> c.l <> shared_ptr<Lambda> <> lambda -}
+        {- MONAD <> c->l <> shared_ptr<Lambda> <> lambda -}
     } else {
-        {- MONAD <> c.lit <> Literal <> literal -}
+        {- MONAD <> c->lit <> Literal <> literal -}
     }
 
 //    {- SKIP <> ")" -}
 
-    c.src.end = next(p.tknvals.begin(), p.idx);
+    c->src.end = next(p.tknvals.begin(), p.idx);
     
     return c;
 }
@@ -101,7 +101,7 @@
             break;
         }
 
-        {- MONAD_F <> c.args.push_back <> Code <> argument -}
+        {- MONAD_F <> c.args.push_back <> unique_ptr<Code> <> argument -}
     }
 
 

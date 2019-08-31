@@ -58,7 +58,7 @@ struct TknvalsRegion {
 struct Code {
     shared_ptr<Lambda> l;
     Literal lit;
-    vector<Code> args;
+    vector<shared_ptr<Code>> args;
 
     // NOTE: tknvalsは変更されないことを想定しています
     TknvalsRegion src;

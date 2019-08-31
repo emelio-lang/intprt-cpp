@@ -9,8 +9,8 @@
 #include "emelio.h"
 #include "util.h"
 
-{! BUILTIN_1 <> name <> shared_ptr<Lambda> #name_p = std::make_shared<Lambda>(Lambda { {"a1"}, {} }); Code c_#name {#name_p, Literal {"#name"}, vector<Code> {}, TknvalsRegion {}}; !}
-{! BUILTIN_2 <> name <> shared_ptr<Lambda> #name_p = std::make_shared<Lambda>(Lambda { {"a1", "a2"}, {} }); Code c_#name {#name_p, Literal {"#name"}, vector<Code> {}, TknvalsRegion {}}; !}
+{! BUILTIN_1 <> name <> shared_ptr<Lambda> #name_p = std::make_shared<Lambda>(Lambda { {"a1"}, {} }); Code c_#name {#name_p, Literal {"#name"}, vector<shared_ptr<Code>> {}, TknvalsRegion {}}; !}
+{! BUILTIN_2 <> name <> shared_ptr<Lambda> #name_p = std::make_shared<Lambda>(Lambda { {"a1", "a2"}, {} }); Code c_#name {#name_p, Literal {"#name"}, vector<shared_ptr<Code>> {}, TknvalsRegion {}}; !}
 
 {- BUILTIN_1 <> negate -}
 {- BUILTIN_2 <> add -}
@@ -21,11 +21,11 @@ struct Notation {
 };
 
 struct ReductionFlow {
-    map<string, Code*> bind = {
-        { "add", &c_add },
-        { "negate", &c_negate },
+    map<string, shared_ptr<Code>> bind = {
+        { "add", make_shared<Code>(c_add) },
+        { "negate", make_shared<Code>(c_negate) },
     };
-    stack<Code*> argstack;
+    stack<shared_ptr<Code>> argstack;
     // NOTE: 未計算のままshadowingするために必要
     map<string, string> shadower;
     vector<Notation> notations;
@@ -97,16 +97,16 @@ Code *ref(string name, ReductionFlow &rf) {
     if (CONTAINS(rf.shadower, name)) {
         string probe = rf.bind[rf.shadower[name]]->lit.val;
         if (CONTAINS(rf.shadower, probe)) {
-            return rf.bind[probe]; 
+            return rf.bind[probe].get();
         }
         // while (CONTAINS(rf.shadower, probe)) {
         //     name = probe;
         //     probe = rf.bind[probe]->lit.val;
         // }
         
-        return rf.bind[rf.shadower[name]];
+        return rf.bind[rf.shadower[name]].get();
     }
-    return rf.bind[name];
+    return rf.bind[name].get();
 }
 #define ref(a) ref(a,rf)
 
@@ -151,7 +151,7 @@ Code replace_code(Code c, const map<string, Code*> &d) {
     }
 
     for (auto &a : c.args) {
-        a = replace_code(a, d);
+        a = make_shared<Code>(replace_code(*a, d)); // ?;
     }
 
     return c;
@@ -182,12 +182,12 @@ inline void apply_notation(Code &code, const Notation& notation) {
         // 文字列を集めてパースただし、関数が潜んでいた場合... = add (f 3) 2;とか
         if (is_notation_free_variable(*i_notval)) {
             int start = i;
-            tmps.push_back(code.args[i]);
+            tmps.push_back(*code.args[i]);
             i++;
             while (true) {
                 if (i >= code.args.size()
                     || 
-                    code.args[i].lit.val == *next(i_notval))
+                    code.args[i]->lit.val == *next(i_notval))
                 {
                     d.insert(make_pair(*i_notval, &tmps[tmps.size()-1]));
                     i--;
@@ -195,13 +195,13 @@ inline void apply_notation(Code &code, const Notation& notation) {
                 }
 
                 tmps[tmps.size()-1].args.push_back(code.args[i]);
-                tmps[tmps.size()-1].src.end = code.args[i].src.end;
+                tmps[tmps.size()-1].src.end = code.args[i]->src.end;
                 
                 i++;
             }
         } else {
-            if (!is_notation_variable(*i_notval) && code.args[i].lit.val != *i_notval) return;
-            d.insert(make_pair(*i_notval, &code.args[i]));
+            if (!is_notation_variable(*i_notval) && code.args[i]->lit.val != *i_notval) return;
+            d.insert(make_pair(*i_notval, code.args[i].get()));
         }
         i++;
     }
@@ -257,7 +257,7 @@ pair<Code, ReductionFlow> S_reduction(Code c, ReductionFlow rf) {
                     // TODO: validity check of configuration (splash off something like 'A B ; C')
 
 
-                    vector<string> to = vector<string>(code.args[1].src.beg, code.args[1].src.end);
+                    vector<string> to = vector<string>(code.args[1]->src.beg, code.args[1]->src.end);
                     rmvparen(to);
                     Code to_code;
                     {
@@ -266,12 +266,12 @@ pair<Code, ReductionFlow> S_reduction(Code c, ReductionFlow rf) {
                         to_code = ::code(pf);
                     }
 
-                    TknvalsRegion conf = code.args[0].src;
+                    TknvalsRegion conf = code.args[0]->src;
                     rmvparen(conf);
 
                     rf.notations.push_back(Notation {conf, to_code});
 
-                    return make_pair(S_reduction(code.args[2],rf).first, rf);
+                    return make_pair(S_reduction(*code.args[2],rf).first, rf);
                 } else if (code.lit.val == "add") {
                     code.l.reset(add_p.get());
                 } else if (code.lit.val == "negate") {
@@ -283,27 +283,19 @@ pair<Code, ReductionFlow> S_reduction(Code c, ReductionFlow rf) {
         }
 
         for (int i = code.args.size()-1; i >= 0; i--) {
-            code.args[i] = S_reduction(code.args[i], rf).first;
-            rf.argstack.push(&code.args[i]);
+            code.args[i] = make_shared<Code>(S_reduction(*code.args[i], rf).first);
+            rf.argstack.push(code.args[i]);
         }
 
         for (string argname : code.l->argnames) {
-            Code *arg;
             if (rf.argstack.empty()) {
                 // TODO: 部分適用 ? 
                 cout << "[ERROR] 引数の数が足りません" << endl;
                 return make_pair(code, rf);
             } else {
-                arg = rf.argstack.top();
+                rf.bind[argname] = rf.argstack.top();
                 rf.argstack.pop();
             }
-
-            // if (CONTAINS(rf.bind, argname)) {
-            //     rf.shadower[argname] = random_string(16);
-            //     // TODO: 衝突!
-            //     rf.bind[rf.shadower[argname]] = arg;
-            // } else
-                rf.bind[argname] = arg;
         }
 
         if (code.lit.val == "add") {
