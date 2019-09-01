@@ -53,7 +53,7 @@
         }
     }
 
-    {- MONAD <> l->body <> Code <> code -}
+    {- MONAD <> l->body <> shared_ptr<Code> <> code -}
 
     {- SKIP <> ")" -}
 
@@ -83,17 +83,17 @@
 
 // ( add 2 3 )
 // ( (|x y| x + y) 2 3 )
-{- PARSE <> Code <> code -}
+{- PARSE <> unique_ptr<Code> <> code -}
 {
-    Code c {};
-    c.src.beg = next(p.tknvals.begin(), p.idx);
+    unique_ptr<Code> c (new Code);
+    c->src.beg = next(p.tknvals.begin(), p.idx);
 
 //    {- SKIP <> "(" -}
 
     if (NOW == "(") {
-        {- MONAD <> c.l <> shared_ptr<Lambda> <> lambda -}
+        {- MONAD <> c->l <> shared_ptr<Lambda> <> lambda -}
     } else {
-        {- MONAD <> c.lit <> Literal <> literal -}
+        {- MONAD <> c->lit <> Literal <> literal -}
     }
 
     while (p.idx < p.tknvals.size()) {
@@ -101,12 +101,12 @@
             break;
         }
 
-        {- MONAD_F <> c.args.push_back <> unique_ptr<Code> <> argument -}
+        {- MONAD_F <> c->args.push_back <> shared_ptr<Code> <> argument -}
     }
 
 
 //    {- SKIP <> ")" -}
-    c.src.end = next(p.tknvals.begin(), p.idx);
+    c->src.end = next(p.tknvals.begin(), p.idx);
 
     return c;
 }

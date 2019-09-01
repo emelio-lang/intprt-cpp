@@ -68,12 +68,12 @@ struct Code {
 
 struct Lambda {
     vector<string> argnames {};
-    Code body;
+    shared_ptr<Code> body;
 };
 
-Code code(ParserFlow& p);
+unique_ptr<Code> code(ParserFlow& p);
 //pair<ProgramData,int> parse(ARG(vector<string>) tknvals, int initial_idx = 0, string basename = "");
-Code reduction(Code code, bool silent = false);
+void reduction(shared_ptr<Code> code, bool silent = false);
 
 
 #define EMELIO_H 1

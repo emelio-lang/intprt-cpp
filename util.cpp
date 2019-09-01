@@ -114,7 +114,7 @@ ostream& operator<<(ostream& stream, const Literal& lit) {
 ostream& operator<<(ostream& stream, Lambda *l) {
     stream << "(λ ";
     for (auto a : l->argnames) stream << a << " ";
-    stream << l->body << ")" << endl;
+    stream << *l->body << ")" << endl;
     return stream;
 }
 
@@ -133,7 +133,7 @@ ostream& operator<<(ostream& stream, const Code& c) {
 ostream& operator<<(ostream& stream, const Lambda& l) {
     stream << "(λ ";
     for (auto a : l.argnames) stream << a << " ";
-    stream << l.body << ")" << endl;
+    stream << *l.body << ")" << endl;
     return stream;
 }
 

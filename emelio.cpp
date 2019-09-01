@@ -9,12 +9,12 @@ int main(int argc, char **argv) {
     if (argc == 2) {
         tkn.tokenize(argv[1]);
         ParserFlow pf = {tkn.tokenvals, 0};
-        Code root = code(pf);
-        Code redu = reduction(root, true);
+        shared_ptr<Code> root = code(pf);
+        reduction(root, true);
 
-        cout << redu.lit.val << endl;
+        cout << root->lit.val << endl;
 
-        return stoi(redu.lit.val);
+        return stoi(root->lit.val);
     } else {
     
         tkn.tokenize_file("test.em");
@@ -23,10 +23,12 @@ int main(int argc, char **argv) {
 
         ParserFlow pf = {tkn.tokenvals, 0};
 
-        Code root = code(pf);
-        cout << root << endl;
-
-        cout << reduction(root) << endl;
+        shared_ptr<Code> root = code(pf);
+        cout << *root << endl;
+        
+        reduction(root);
+        
+        cout << *root << endl;
 
         return 0;
     }
