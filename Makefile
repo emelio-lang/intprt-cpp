@@ -13,15 +13,17 @@ tk.o: Tokenizer/tokenizer.cpp
 	g++ -c $< -g3 -o $@
 util.o: util.cpp emelio.h util.h
 	g++ -c $< -g3 -o $@
-reduction.o: reduction.cpp.cc emelio.h util.h
+reduction.o: reduction.cpp.cc emelio.h util.h notation.h
 	g++ -c $< -g3 -o $@
 parse.o: parse.cpp.cc emelio.h util.h
+	g++ -c $< -g3 -o $@
+notation.o: notation.cpp emelio.h util.h notation.h
 	g++ -c $< -g3 -o $@
 emelio.o: emelio.cpp emelio.h util.h
 	g++ -c $< -g3 -o $@
 
 
-OBJS = tkutil.o tk.o util.o parse.o reduction.o emelio.o
+OBJS = tkutil.o tk.o util.o parse.o notation.o reduction.o emelio.o 
 SML_OBJS = tkutil.o tk.o  util.o parse.o emelio.o
 
 

@@ -8,17 +8,13 @@
 
 #include "emelio.h"
 #include "util.h"
+#include "notation.h"
 
 {! BUILTIN_1 <> name <> shared_ptr<Lambda> #name_p = std::make_shared<Lambda>(Lambda { {"a1"}, {} }); Code c_#name {#name_p, Literal {"#name"}, vector<shared_ptr<Code>> {}, TknvalsRegion {}}; !}
 {! BUILTIN_2 <> name <> shared_ptr<Lambda> #name_p = std::make_shared<Lambda>(Lambda { {"a1", "a2"}, {} }); Code c_#name {#name_p, Literal {"#name"}, vector<shared_ptr<Code>> {}, TknvalsRegion {}}; !}
 
 {- BUILTIN_1 <> negate -}
 {- BUILTIN_2 <> add -}
-
-struct Notation {
-    TknvalsRegion config;
-    shared_ptr<Code> to;
-};
 
 struct ReductionFlow {
     map<string, shared_ptr<Code>> bind = {
@@ -29,6 +25,7 @@ struct ReductionFlow {
     // NOTE: 未計算のままshadowingするために必要
     map<string, string> shadower;
     vector<Notation> notations;
+    vector<Notation> greedy_notations;
 };
 
 
@@ -59,7 +56,7 @@ static inline void rmvparen(TknvalsRegion &r) {
     if (distance(r.beg, r.end) == 0) return;
 
     if (*r.beg == "(") r.beg++;
-    if (*r.end == ")") r.end--;
+    if (*prev(r.end) == ")") r.end--;
 }
 
 
@@ -119,120 +116,42 @@ shared_ptr<Code> ref(string name, ReductionFlow &rf) {
 }
 #define ref(a) ref(a,rf)
 
-inline bool is_notation_variable(const string& s) {
-    bool res = true;
-    for (char c : s) if (!isupper(c)) res = false;
-    return res;
-}
-
-inline bool is_notation_free_variable(const string& s) {
-    bool res = true;
-    for (int i = 0; i < s.size()-1; ++i)
-        if (!isupper(s[i])) res = false;
-    if (s.back() != 's') res = false;
-    return res;
-}
-
-
-// NOTE: 左右に変数がない場合、適当な文字を入れ込みます
-void pad_notation_config(vector<string>& config) {
-    if (!is_notation_variable(config[0])) {
-        config.insert(config.begin(), random_saneupper_string(16));
-    }
-    if (!is_notation_variable(config.back())) {
-        config.push_back(random_saneupper_string(16));
-    }
-}
-
-void replace_code(shared_ptr<Code> c, const map<string, shared_ptr<Code>> &d) {
-    if (c->l) {
-        for (string &a : c->l->argnames) {
-            if (CONTAINS(d, a)) {
-                a = d.at(a)->lit.val; // ?
-            }
-        }
-
-        replace_code(c->l->body, d);
-    } else if (c->lit.val != "") {
-        if (CONTAINS(d, c->lit.val)) {
-            c = d.at(c->lit.val);
-        }
-    }
-
-    
-//    for (auto &a : c->args) {
-    for (int i = 0; i < c->args.size(); ++i) {
-        replace_code(c->args[i], d); // ?;
-    }
-}
-
-
-inline void apply_notation(shared_ptr<Code> code, const Notation& notation) {
-    // first, check length
-    if (code->args.size()+1 < notation.config.size())
-        return;
-
-
-    map<string, shared_ptr<Code>> d;
-    if (!is_notation_variable(*notation.config.beg) && code->lit.val != *notation.config.beg) return;
-    d.insert(make_pair(*notation.config.beg, code));
-
-
-    int i = 0;
-    for (auto i_notval = next(notation.config.beg);
-         i_notval != notation.config.end;
-         i_notval++)
-    {
-        // NOTE: 大きさのチェックは最初にしたのでこのときのみがチェック対象
-        if (i >= code->args.size()) break;
-
-        // free variable
-        // 文字列を集めてパースただし、関数が潜んでいた場合... = add (f 3) 2;とか
-        if (is_notation_free_variable(*i_notval)) {
-            int start = i;
-            shared_ptr<Code> tmp = make_shared<Code>(*code->args[i]);
-            i++;
-            while (true) {
-                if (i >= code->args.size()
-                    || 
-                    code->args[i]->lit.val == *next(i_notval))
-                {
-                    d.insert(make_pair(*i_notval, tmp));
-                    i--;
-                    break;
-                }
-
-                tmp->args.push_back(code->args[i]);
-                tmp->src.end = code->args[i]->src.end;
-                
-                i++;
-            }
-        } else {
-            if (!is_notation_variable(*i_notval) && code->args[i]->lit.val != *i_notval) return;
-            d.insert(make_pair(*i_notval, code->args[i]));
-        }
-        i++;
-    }
-
-    // Code fruit;
-    // fruit.deep_copy_from(notation.to);
-
-    replace_code(code, d);
-}
 
 ReductionFlow S_reduction(shared_ptr<Code> code, ReductionFlow rf) {
-
     shared_ptr<Code> given_p = code;
     
     while ( true ) {
 
         cout << "Reductioning ... " << endl;
-        cout << *code << endl;
+        cout << *code << endl << endl;
 
         // Apply notations
-        for (const auto n : rf.notations) {
-            apply_notation(code, n);
+        {
+            bool reapply = false;
+            {
+                auto n = rf.greedy_notations.begin();
+                while (n != rf.greedy_notations.end()) {
+                    reapply = apply_notation_greedily(code, *n);
+                    n++;
+                }
+            }
+            {
+                auto n = rf.notations.begin();
+                while (n != rf.notations.end()) {
+                    reapply = apply_notation(code, *n);
+                    n++;
+                }
+            }
+
+            if (reapply) continue;
         }
+        // {
+        //     auto n = rf.notations.end();
+        //     while (n != rf.notations.begin()) {
+        //         n--;
+        //         apply_notation(code, *n);
+        //     } 
+        // }
 
         if (!code->l) {
             if (is_literal(code->lit.val)) {
@@ -249,16 +168,16 @@ ReductionFlow S_reduction(shared_ptr<Code> code, ReductionFlow rf) {
                         }
                         res = *ref(res.lit.val); // DEBUG: check its counter ここでは消されないはず
                     }
-                    // DEBUG: ここdeep copyじゃなくて大丈夫かな
-                    code->l = res.l;
+
+                    if (res.l) {
+                        if (!code->l)
+                            code->l = shared_ptr<Lambda>(new Lambda);
+                        code->l->deep_copy_from(*res.l);
+                    } else res.l = shared_ptr<Lambda>(nullptr);
                     code->lit = res.lit;
-                    copy(res.args.begin(), res.args.begin(), back_inserter(code->args)); //?
-                    // Code res = reduction(*rf.bind[code->lit.val], rf).first;
-                    // res.args = code->args;
-                    // rf.bind[code->lit.val] = &res; // NOTE: 結果反映
-                    // c = res;
-                    // TODO: どうすれば...
-                } else if (code->lit.val == "notation") {
+                    // copy(res.args.begin(), res.args.begin(), back_inserter(code->args)); //?
+
+            } else if (code->lit.val == "notation" || code->lit.val == "gnotation") {
                     // 表記の書き換え
                     // 書き換え規則を取得して、第三引数のコードをソース情報から書き換える。
                     // 再度パースしてできたCodeのreductionを今回の結果とする
@@ -285,15 +204,21 @@ ReductionFlow S_reduction(shared_ptr<Code> code, ReductionFlow rf) {
                     TknvalsRegion conf = code->args[0]->src;
                     rmvparen(conf);
 
+                    if (code->lit.val == "notation") {
                     rf.notations.push_back(Notation {conf, to_code});
+                    } else if (code->lit.val == "gnotation") {
+                    rf.greedy_notations.push_back(Notation {conf, to_code});
+                    }
 
                     // DEBUG
-                    code = code->args[2];
-                    return S_reduction(code,rf);
+                    *given_p = *code->args[2];
+                    return S_reduction(given_p, rf);
                 } else if (code->lit.val == "add") {
                     code->l.reset(add_p.get());
                 } else if (code->lit.val == "negate") {
                     code->l.reset(negate_p.get());
+                } else if (code->lit.val == "nothing") {
+                    
                 } else {
                     cout << "[ERROR] '" << code->lit.val << "'というような名前は見つかりません" << endl;
                 }
@@ -319,8 +244,10 @@ ReductionFlow S_reduction(shared_ptr<Code> code, ReductionFlow rf) {
         if (code->lit.val == "add") {
             pair<int,bool> tmp1 = read_int_litcode(ref("a1"));
             pair<int,bool> tmp2 = read_int_litcode(ref("a2"));
+
             
             if (tmp1.second && tmp2.second) {
+                cout << "add " << tmp1.first << " " << tmp2.first << endl << endl;
                 *given_p = make_int_litcode(tmp1.first + tmp2.first);
                 return rf;
             } else {
@@ -331,6 +258,7 @@ ReductionFlow S_reduction(shared_ptr<Code> code, ReductionFlow rf) {
             pair<int,bool> tmp1 = read_int_litcode(ref("a1"));
             
             if (tmp1.second) {
+                cout << "negate " << tmp1.first << endl << endl;
                 *given_p  = make_int_litcode(-tmp1.first);
                 return rf;
             } else {
@@ -350,92 +278,6 @@ ReductionFlow S_reduction(shared_ptr<Code> code, ReductionFlow rf) {
 }
 
 
-
-// pair<Code, ReductionFlow> reduction(Code code, ReductionFlow rf) {
-
-//     ReductionFlow oldrf = rf;
-
-//     cout << "Reductioning ... " << endl;
-//     cout << code << endl;
-
-//     if (!code.l) {
-//         if (is_literal(code.lit.val)) return make_pair(code,rf);
-//         else {
-//             if (CONTAINS(rf.bind, code.lit.val)) {
-//                 Code res = *ref(code.lit.val);
-//                 while (!res.l) {
-//                     if (is_literal(res.lit.val)) return make_pair(res, rf);
-//                     res = *ref(res.lit.val);
-//                 }
-//                 code.l = res.l;
-//                 code.lit = res.lit;
-//                 copy(res.args.begin(), res.args.begin(), back_inserter(code.args));
-//                 // Code res = reduction(*rf.bind[code.lit.val], rf).first;
-//                 // res.args = code.args;
-//                 // rf.bind[code.lit.val] = &res; // NOTE: 結果反映
-//                 // c = res;
-//                 // TODO: どうすれば...
-//             } else if (code.lit.val == "add") {
-//                 code.l = &add;
-//             } else if (code.lit.val == "negate") {
-//                 code.l = &::negate;
-//             } else {
-//                 cout << "[ERROR] '" << code.lit.val << "'というような名前は見つかりません" << endl;
-//             }
-//         }
-//     }
-
-//     for (int i = code.args.size()-1; i >= 0; i--) {
-//         rf.argstack.push(&code.args[i]);
-//     }
-
-//     for (string argname : code.l->argnames) {
-//         Code *arg;
-//         if (rf.argstack.empty()) {
-//             // TODO: 部分適用 ? 
-//             cout << "[ERROR] 引数の数が足りません" << endl;
-//             return make_pair(code, rf);
-//         } else {
-//             arg = rf.argstack.top();
-//             rf.argstack.pop();
-//         }
-
-//         // if (CONTAINS(rf.bind, argname)) {
-//         //     rf.shadower[argname] = random_string(16);
-//         //     // TODO: 衝突!
-//         //     rf.bind[rf.shadower[argname]] = arg;
-//         // } else
-//         rf.bind[argname] = arg;
-//     }
-
-//     if (code.lit.val == "add") {
-//         Code a1 = reduction(*ref("a1"),rf).first;
-//         Code a2 = reduction(*ref("a2"),rf).first;
-//         pair<int,bool> tmp1 = read_int_litcode(a1);
-//         pair<int,bool> tmp2 = read_int_litcode(a2);
-            
-//         if (tmp1.second && tmp2.second) 
-//             return make_pair(make_int_litcode(tmp1.first + tmp2.first), rf);
-//         else
-//             return make_pair(Code (&add, Literal{"add"}, code.args), rf); // NOTE: ここのliteralを入れておくことでbodyが無いことを示せる
-//     } else if (code.lit.val == "negate") {
-//         Code a1 = reduction(*ref("a1"),rf).first;
-//         pair<int,bool> tmp1 = read_int_litcode(a1);
-            
-//         if (tmp1.second) 
-//             return make_pair(make_int_litcode(-tmp1.first), rf);
-//         else
-//             return make_pair(Code (&::negate, Literal{"negate"}, code.args), rf);
-//     }
-
-//     if (!code.l->body->l && code.l->body->lit.val == "")
-//         return make_pair(code, rf);
-    
-//     return make_pair(reduction(code.l->body,rf).first, rf);
-// }
-
-
-
 void reduction(shared_ptr<Code> code, bool silent) {
     auto back = cout.rdbuf();
     if (silent) {
@@ -449,13 +291,3 @@ void reduction(shared_ptr<Code> code, bool silent) {
         cout.rdbuf(back);
     }
 }
-
-
-// Code F_reduction(Code code, ReductionFlow rf) {
-//     if (!code.l) return code;
-
-//     ReductionFlow oldrf = rf;
-//     for (Code arg : code.args) {
-//         reduction(arg, oldrf);
-//     }
-// }

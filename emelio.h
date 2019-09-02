@@ -69,6 +69,8 @@ struct Code {
 struct Lambda {
     vector<string> argnames {};
     shared_ptr<Code> body;
+
+    void deep_copy_from(const Lambda& other);
 };
 
 unique_ptr<Code> code(ParserFlow& p);

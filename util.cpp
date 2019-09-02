@@ -36,16 +36,29 @@
 void Code::deep_copy_from(const Code& other) {
     lit = other.lit;
     src = other.src;
-    
+
+    // もうすでにnullでないptrを持っているならそれを活かす
     if (other.l) {
-        l = shared_ptr<Lambda>(new Lambda);
-        *l = *other.l;
+        if (!l) l = shared_ptr<Lambda>(new Lambda);
+        l->deep_copy_from(*other.l);
     } else {
         l = shared_ptr<Lambda>(nullptr);
     }
 
+    args.clear();
     for (const shared_ptr<Code> &c : other.args) {
-        args.push_back(make_shared<Code>(*c));
+        shared_ptr<Code> copied (new Code);
+        copied->deep_copy_from(*c);
+        args.push_back(copied);
+    }
+}
+
+void Lambda::deep_copy_from(const Lambda& other) {
+    argnames = other.argnames;
+
+    if (other.body) {
+        if (!body) body = shared_ptr<Code>(new Code);
+        body->deep_copy_from(*other.body);
     }
 }
 
@@ -133,7 +146,8 @@ ostream& operator<<(ostream& stream, const Code& c) {
 ostream& operator<<(ostream& stream, const Lambda& l) {
     stream << "(λ ";
     for (auto a : l.argnames) stream << a << " ";
-    stream << *l.body << ")" << endl;
+    if (l.body) stream << *l.body << ")" << endl;
+    else stream << "--NO BODY LAMBDA--" << ")" << endl;
     return stream;
 }
 
