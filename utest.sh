@@ -86,6 +86,7 @@ do
         echo -e "\e[1;31mError!\e[0m "
         echo "Expected '$ans', but '$res'.";
         echo $title
+        echo $code
     fi
         
 done
