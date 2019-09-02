@@ -1,7 +1,7 @@
 %.cpp.cc: %.cpp
 	python pp.py $<
-	astyle $@ -Y
-	rm *.orig
+#	astyle $@ -Y
+#	rm *.orig
 
 %.a: %.o
 	ar r $@ $<

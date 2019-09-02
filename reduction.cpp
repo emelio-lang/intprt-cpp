@@ -261,7 +261,9 @@ ReductionFlow S_reduction(shared_ptr<Code> code, ReductionFlow rf) {
                 cout << "[ERROR] 引数の数が足りません" << endl;
                 return rf;
             } else {
-                rf.bind[argname] = rf.argstack.top();
+                if (argname != "_") {
+                    rf.bind[argname] = rf.argstack.top();
+                }
                 rf.argstack.pop();
             }
         }

@@ -81,3 +81,7 @@ add ((2)) (((3)))
 引数関数の複数回適用
 (|subtract| subtract (subtract 2 7) 8) (|a b| add a (negate b))
 -13
+
+空引数
+(|f| f 1 2) ((|x _ y| add x y) 3)
+5
