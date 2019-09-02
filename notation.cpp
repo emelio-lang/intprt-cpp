@@ -83,6 +83,7 @@ bool apply_notation_greedily(shared_ptr<Code> &code, const Notation& notation) {
     // d.insert(make_pair(*notation.config.beg, code));
 
     int i = 0;
+    int match_count = 0;
     for (auto i_notval = notation.config.beg;
          i_notval != notation.config.end;
          i_notval++)
@@ -117,12 +118,37 @@ bool apply_notation_greedily(shared_ptr<Code> &code, const Notation& notation) {
             }
 
             while (true) {
-                if (i >= code->args.size()
-                    || 
-                    code->args[i]->lit.val == *next(i_notval))
+                if (i >= code->args.size())
                 {
                     d.insert(make_pair(*i_notval, tmp));
+                    match_count++;
                     break;
+                }
+
+                // DEBUG: As A = Bsとかは読み込める？
+                {
+                    bool escape = true;
+                    int j = 1;
+                    while (true) {
+                        if (next(i_notval,j) == notation.config.end) {
+                            escape = false;
+                            break;
+                        }
+                        if (is_notation_free_variable(*next(i_notval,j))) break;
+                        if (!is_notation_variable(*next(i_notval,j))) {
+                            if (code->args[i+j-1]->lit.val != *next(i_notval,j)) {
+                                escape = false;
+                                break;
+                            }
+                        }
+                        j++;
+                    }
+
+                    if (escape) {
+                        d.insert(make_pair(*i_notval, tmp));
+                        match_count++;
+                        break;
+                    }
                 }
 
                 tmp->args.push_back(code->args[i]);
@@ -134,16 +160,18 @@ bool apply_notation_greedily(shared_ptr<Code> &code, const Notation& notation) {
             if (i_notval == notation.config.beg) {
                 if (!is_notation_variable(*i_notval) && code->lit.val != *i_notval) return false;
                 d.insert(make_pair(*i_notval, code));
+                match_count++;
             } else {
                 if (!is_notation_variable(*i_notval) && code->args[i]->lit.val != *i_notval) return false;
                 d.insert(make_pair(*i_notval, code->args[i]));
+                match_count++;
                 i++;
             }
         }
     }
 
     // 十分にマッチできていない
-    if (d.size() != notation.config.size()) return false;
+    if (match_count/*d.size()NOTE:重複でうまく働かないのでカウンタ*/ != notation.config.size()) return false;
 
 // Code fruit;
     // fruit.deep_copy_from(notation.to);
@@ -189,14 +217,37 @@ bool check_match_code(TknvalsRegion config, const shared_ptr<Code> &code, int in
             }
 
             while (true) {
-                if (i >= code->args.size()
-                    || 
-                    code->args[i]->lit.val == *next(i_notval)
-                    )
+                if (i >= code->args.size())
                 {
                     res_count++;
                     break;
                 }
+
+                {
+                    bool escape = true;
+                    int j = 1;
+                    while (true) {
+                        if (next(i_notval,j) == config.end) {
+                            escape = false;
+                            break;
+                        }
+//                        if (next(i_notval,j) == config.end) break;
+                        if (is_notation_free_variable(*next(i_notval,j))) break;
+                        if (!is_notation_variable(*next(i_notval,j))) {
+                            if (code->args[i+j-1]->lit.val != *next(i_notval,j)) {
+                                escape = false;
+                                break;
+                            }
+                        }
+                        j++;
+                    }
+
+                    if (escape) {
+                        res_count++;
+                        break;
+                    }
+                }
+
                 
                 i++;
             }
@@ -282,15 +333,41 @@ match_code(
             }
 
             while (true) {
-                if (i >= code->args.size()
-                    || 
-                    code->args[i]->lit.val == *next(i_notval)
-                    )
+                if (i >= code->args.size())
                 {
                     if (res) res->insert(make_pair(*i_notval, tmp));
                     res_count++;
                     break;
                 }
+
+                
+                // DEBUG: As A = Bsとかは読み込める？
+                {
+                    bool escape = true;
+                    int j = 1;
+                    while (true) {
+                        if (next(i_notval,j) == config.end) {
+                            escape = false;
+                            break;
+                        }
+//                        if (next(i_notval,j) == config.end) break;
+                        if (is_notation_free_variable(*next(i_notval,j))) break;
+                        if (!is_notation_variable(*next(i_notval,j))) {
+                            if (code->args[i+j-1]->lit.val != *next(i_notval,j)) {
+                                escape = false;
+                                break;
+                            }
+                        }
+                        j++;
+                    }
+
+                    if (escape) {
+                        if (res) res->insert(make_pair(*i_notval, tmp));
+                        res_count++;
+                        break;
+                    }
+                }
+
 
                 if (perdu && code->args[i]->lit.val == exit_token && prev(config.end) == i_notval) {
                     // もしかしたら同じnotationがもう一回繰り返しているかもしれない --> チェックする

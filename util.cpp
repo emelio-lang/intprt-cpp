@@ -60,7 +60,22 @@ void Lambda::deep_copy_from(const Lambda& other) {
         if (!body) body = shared_ptr<Code>(new Code);
         body->deep_copy_from(*other.body);
     }
+
+    // fused.clear();
+    // for (const shared_ptr<Lambda> &l : other.fused) {
+    //     shared_ptr<Lambda> copied (new Lambda);
+    //     copied->deep_copy_from(*l);
+    //     fused.push_back(copied);
+    // }
 }
+
+bool is_computed(const shared_ptr<Code> &c) {
+    return (c && !c->l);
+}
+
+// bool is_fusable(const shared_ptr<Code> &c) {
+//     return c->args.size() == 0;
+// }
 
 //Code::~Code() { if (l) delete l; }
 
@@ -144,10 +159,18 @@ ostream& operator<<(ostream& stream, const Code& c) {
 }
 
 ostream& operator<<(ostream& stream, const Lambda& l) {
-    stream << "(λ ";
-    for (auto a : l.argnames) stream << a << " ";
-    if (l.body) stream << *l.body << ")" << endl;
-    else stream << "--NO BODY LAMBDA--" << ")" << endl;
+    // if (l.fused.size() == 0) {
+        stream << "(λ ";
+        for (auto a : l.argnames) stream << a << " ";
+        if (l.body) stream << *l.body << ")" << endl;
+        else stream << "--NO BODY LAMBDA--" << ")" << endl;
+    // } else {
+    //     stream << "(λ-fuse ";
+    //     for (const shared_ptr<Lambda> fus : l.fused) {
+    //         stream << *fus;
+    //     }
+    //     stream << ")" << endl;
+    // }
     return stream;
 }
 
@@ -203,4 +226,6 @@ bool is_all_upper(string &s) {
                                                 });
 }
 
- 
+int maxzero(int n) {
+    return std::max(0, n);
+}

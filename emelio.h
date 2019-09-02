@@ -70,6 +70,8 @@ struct Lambda {
     vector<string> argnames {};
     shared_ptr<Code> body;
 
+//    vector<shared_ptr<Lambda>> fused;
+
     void deep_copy_from(const Lambda& other);
 };
 
