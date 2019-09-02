@@ -1,3 +1,5 @@
+Let Notation (;もあるよ)
+5
 (gnotation (let A = As ; Bs) ((|A| Bs) (As)) (
 (gnotation (As ; Bs) ((|x| Bs) (As)) (
   let subtract = (|a b| add a (negate b));
