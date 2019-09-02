@@ -10,6 +10,8 @@
 #include "util.h"
 #include "notation.h"
 
+int ReductionCounter = 0;
+
 {! BUILTIN_1 <> name <> shared_ptr<Lambda> #name_p = std::make_shared<Lambda>(Lambda { {"a1"}, {} }); Code c_#name {#name_p, Literal {"#name"}, vector<shared_ptr<Code>> {}, TknvalsRegion {}}; !}
 {! BUILTIN_2 <> name <> shared_ptr<Lambda> #name_p = std::make_shared<Lambda>(Lambda { {"a1", "a2"}, {} }); Code c_#name {#name_p, Literal {"#name"}, vector<shared_ptr<Code>> {}, TknvalsRegion {}}; !}
 
@@ -124,6 +126,7 @@ ReductionFlow S_reduction(shared_ptr<Code> code, ReductionFlow rf) {
 
         cout << "Reductioning ... " << endl;
         cout << *code << endl << endl;
+        ReductionCounter++;
 
         // Apply notations
         {
@@ -286,6 +289,8 @@ void reduction(shared_ptr<Code> code, bool silent) {
 
     ReductionFlow rf = {};
     S_reduction(code, rf);
+
+    cout << ReductionCounter << " reductions." << endl;
 
     if (silent) {
         cout.rdbuf(back);
