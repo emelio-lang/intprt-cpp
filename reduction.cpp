@@ -17,11 +17,13 @@ int ReductionCounter = 0;
 
 {- BUILTIN_1 <> negate -}
 {- BUILTIN_2 <> add -}
+{- BUILTIN_2 <> concat -}
 
 struct ReductionFlow {
     map<string, shared_ptr<Code>> bind = {
         { "add", make_shared<Code>(c_add) },
         { "negate", make_shared<Code>(c_negate) },
+        { "concat", make_shared<Code>(c_concat) },
     };
     stack<shared_ptr<Code>> argstack;
     // NOTE: 未計算のままshadowingするために必要
@@ -78,6 +80,18 @@ pair<int,bool> read_int_litcode(const shared_ptr<Code> c) {
     return make_pair(stoi(c->lit.val), true);
 }
 
+pair<string,bool> read_string_litcode(const shared_ptr<Code> c) {
+    if (!check_computed(c)) {
+        if (c) {
+            cout << "[ERROR] (TODO:カインド) 次のようなCodeをStringリテラルとして読もうとしました" << endl;
+            cout << *c << endl;
+        }
+        return make_pair("", false);
+    } 
+
+    return make_pair(c->lit.val, true);
+}
+
 // pair<int,bool> read_int_litcode(const Code& c) {
 //     if (!check_computed(&c)) {
 //         cout << "[ERROR] (TODO:カインド) 次のようなCodeをIntリテラルとして読もうとしました" << endl;
@@ -94,6 +108,10 @@ pair<int,bool> read_int_litcode(const shared_ptr<Code> c) {
 // }
 Code make_int_litcode(int n) {
     return Code {0, Literal { to_string(n) }};
+}
+
+Code make_string_litcode(string n) {
+    return Code {0, Literal { n }};
 }
 
 // unique_ptr<Code> make_int_litcode(int n) {
@@ -220,10 +238,14 @@ ReductionFlow S_reduction(shared_ptr<Code> code, ReductionFlow rf) {
                     code->l.reset(add_p.get());
                 } else if (code->lit.val == "negate") {
                     code->l.reset(negate_p.get());
+                } else if (code->lit.val == "concat") {
+                    code->l.reset(concat_p.get());
                 } else if (code->lit.val == "nothing") {
                     
                 } else {
                     cout << "[ERROR] '" << code->lit.val << "'というような名前は見つかりません" << endl;
+                    *given_p = *code;
+                    return rf;
                 }
             }
         }
@@ -263,6 +285,18 @@ ReductionFlow S_reduction(shared_ptr<Code> code, ReductionFlow rf) {
             if (tmp1.second) {
                 cout << "negate " << tmp1.first << endl << endl;
                 *given_p  = make_int_litcode(-tmp1.first);
+                return rf;
+            } else {
+                *given_p = *code;
+                return rf;
+            }
+        } else if (code->lit.val == "concat") {
+            pair<string,bool> tmp1 = read_string_litcode(ref("a1"));
+            pair<string,bool> tmp2 = read_string_litcode(ref("a2"));
+            
+            if (tmp1.second && tmp2.second) {
+                cout << "concat " << tmp1.first << " " << tmp2.first << endl << endl;
+                *given_p = make_string_litcode(tmp1.first + tmp2.first);
                 return rf;
             } else {
                 *given_p = *code;
