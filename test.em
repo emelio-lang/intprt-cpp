@@ -1,4 +1,4 @@
-(gnotation (notation As = Bs ; Cs) (notation As Bs Cs) (
+//hello
 (gnotation (let A = Bs ; Cs) ((|A| Cs) (Bs)) (
 (gnotation (As ; Bs) ((|x| Bs) (As)) (
 (gnotation (As $ Bs) (As Bs) (
@@ -13,7 +13,6 @@
   let v = 2 - 8 - 7;
 
   3 - 5 + 2 - 8 -7 + 13
-))
 ))
 ))
 ))

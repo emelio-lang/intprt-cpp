@@ -15,6 +15,20 @@ int main(int argc, char **argv) {
         cout << root->lit.val << endl;
 
         return stoi(root->lit.val);
+    } else if (argc > 2) {
+        std::cin >> std::noskipws;
+        std::istream_iterator<char> it(std::cin);
+        std::istream_iterator<char> end;
+        string input(it, end);
+
+        tkn.tokenize(input);
+        ParserFlow pf = {tkn.tokenvals, 0};
+        shared_ptr<Code> root = code(pf);
+        reduction(root, true);
+
+        cout << root->lit.val << endl;
+
+        return stoi(root->lit.val);
     } else {
     
         tkn.tokenize_file("test.em");
