@@ -19,11 +19,13 @@ parse.o: parse.cpp.cc emelio.h util.h
 	g++ -c $< -g3 -o $@
 notation.o: notation.cpp emelio.h util.h notation.h
 	g++ -c $< -g3 -o $@
+transpile.o: transpile.cpp emelio.h util.h notation.h
+	g++ -c $< -g3 -o $@
 emelio.o: emelio.cpp emelio.h util.h
 	g++ -c $< -g3 -o $@
 
 
-OBJS = tkutil.o tk.o util.o parse.o notation.o reduction.o emelio.o 
+OBJS = tkutil.o tk.o util.o parse.o notation.o reduction.o transpile.o emelio.o 
 SML_OBJS = tkutil.o tk.o  util.o parse.o emelio.o
 
 

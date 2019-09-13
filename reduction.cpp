@@ -89,6 +89,15 @@ pair<string,bool> read_string_litcode(const shared_ptr<Code> c) {
     return make_pair(c->lit.val, true);
 }
 
+// unique_ptr<Code> make_procedural_code(shared_ptr<Code> from, shared_ptr<Code> to) {
+//     return make_unique<Code>(Code {
+//             make_shared<Lambda>(Lambda{{"_"}, to}),
+//             "",
+//             { from },
+//             TknvalsRegion { from.src.beg, to.src.end } // TODO: これ大丈夫？
+//         });
+// }
+
 Code make_int_litcode(int n) {
     return Code {0, Literal { to_string(n) }};
 }
@@ -216,8 +225,10 @@ continue_reduction_loop:
 
                         // NOTE: つまり前の階層と同じようなことをする
                         // ここのcontinueは例えばfuseとかはbindにないので、continueすることで再ロードできる
+                        // TODO: fuseの場合はこれじゃ駄目だけど、とりあえず一貫性を保っておく
                         if (!CONTAINS(rf.bind, res.lit.val)) {
-                            break;
+                            *given_p = res;
+                            return rf;
                         }
                         res = *ref(res.lit.val); // DEBUG: check its counter ここでは消されないはず
                     }
@@ -407,4 +418,142 @@ void reduction(shared_ptr<Code> code, bool silent) {
     if (silent) {
         cout.rdbuf(back);
     }
+}
+
+bool check_all_notations(shared_ptr<Code> code,
+                         const vector<Notation> &notations,
+                         const vector<Notation> &gnotations
+                         )
+{
+    bool reapply = false;
+    {
+        auto n = gnotations.begin();
+        while (n != gnotations.end()) {
+            reapply = apply_notation_greedily(code, *n);
+            n++;
+        }
+    }
+    {
+        auto n = notations.begin();
+        while (n != notations.end()) {
+            reapply = apply_notation(code, *n);
+            n++;
+        }
+    }
+
+//    if (reapply) apply_all_notations(code, notations, gnotations, true);
+
+    return reapply;
+}
+
+bool apply_all_notations(shared_ptr<Code> &code,
+                         const vector<Notation> &notations,
+                         const vector<Notation> &gnotations,
+                         bool rv = false
+                         )
+{
+    bool reapply = false;
+    {
+        auto n = gnotations.begin();
+        while (n != gnotations.end()) {
+            reapply = apply_notation_greedily(code, *n);
+            n++;
+        }
+    }
+    {
+        auto n = notations.begin();
+        while (n != notations.end()) {
+            reapply = apply_notation(code, *n);
+            n++;
+        }
+    }
+
+    if (reapply) apply_all_notations(code, notations, gnotations, true);
+
+    return rv;
+}
+
+
+ReductionFlow extract_all_notations(shared_ptr<Code> &code, ReductionFlow rf) {
+    cout << *code << endl << endl;
+
+    // これはまだ続くのかどうか TODO 一貫性
+//    if (check_all_notations(code, rf.notations, rf.greedy_notations)) return rf;
+
+    // Apply notations
+    apply_all_notations(code, rf.notations, rf.greedy_notations);
+
+    if (!code->l) {
+        if (is_literal(code->lit.val)) {
+//                *given_p = *code;
+            return rf;
+        } else {
+            if (code->lit.val == "notation" || code->lit.val == "gnotation") {
+                // 表記の書き換え
+                // 書き換え規則を取得して、第三引数のコードをソース情報から書き換える。
+                // 再度パースしてできたCodeのreductionを今回の結果とする
+                // NOTE: 実行順序は関係あるの？まとめてやったら？何度もパースしたくないし
+                if (code->args.size() != 3) {
+                    cout << "[ERROR] notationの引数の数が違います";
+                    return rf; // NOTE: エラー値として
+                }
+
+
+                // TODO: validity check of configuration (splash off something like 'A B ; C')
+
+
+                // vector<string> to = vector<string>(code->args[1]->src.beg, code->args[1]->src.end);
+                // rmvparen(to);
+                shared_ptr<Code> to_code = make_shared<Code>(*code->args[1]);
+                // {
+
+                //     ParserFlow pf = {to, 0};
+                //     to_code = ::code(pf);
+                // }
+
+                TknvalsRegion conf = code->args[0]->src;
+                rmvparen(conf);
+
+                if (code->lit.val == "notation") {
+                    rf.notations.push_back(Notation {conf, to_code});
+                } else if (code->lit.val == "gnotation") {
+                    rf.greedy_notations.push_back(Notation {conf, to_code});
+                }
+
+                // DEBUG
+                // TODO: ここで前のやつと繋げないといけなさそう
+                // 先に引数の方を展開して、手続き結合をして返す
+                extract_all_notations(code->args[2], rf);
+                code = code->args[2];
+//                    *code = *code->args[2];
+                return rf;
+            }
+
+            for (int i = code->args.size()-1; i >= 0; i--) {
+                extract_all_notations(code->args[i], rf);
+            }
+
+            return rf;
+        }
+    }
+
+    for (int i = code->args.size()-1; i >= 0; i--) {
+//        if (check_all_notations(code->args[i], rf.notations, rf.greedy_notations)) {
+            extract_all_notations(code->args[i], rf);
+//        }
+    }
+
+    if (!code->l->body->l && code->l->body->lit.val == "") {
+//            *given_p = *code;
+        return rf;
+    }
+
+    extract_all_notations(code->l->body, rf);
+    return rf;
+}
+
+
+void extract_all_notations(shared_ptr<Code> code) {
+    ReductionFlow rf = {};
+    extract_all_notations(code, rf);
 }

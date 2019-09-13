@@ -40,9 +40,13 @@ int main(int argc, char **argv) {
         shared_ptr<Code> root = code(pf);
         cout << *root << endl;
         
-        reduction(root);
+        extract_all_notations(root);
+
+//        reduction(root);
         
         cout << *root << endl;
+
+        
 
         return 0;
     }

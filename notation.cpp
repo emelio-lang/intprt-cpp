@@ -48,7 +48,7 @@ void replace_code(shared_ptr<Code> c, const map<string, shared_ptr<Code>> &d) {
             (is_notation_variable(c->lit.val) || is_notation_free_variable(c->lit.val))
             )
         {
-            if (c->args.size() == 0) {
+            if (c->args.size() == 0) { // TODO: どういう意図？
                 *c = *d.at(c->lit.val);
                 return;
             } else {
@@ -159,7 +159,15 @@ bool apply_notation_greedily(shared_ptr<Code> &code, const Notation& notation) {
         } else {
             if (i_notval == notation.config.beg) {
                 if (!is_notation_variable(*i_notval) && code->lit.val != *i_notval) return false;
-                d.insert(make_pair(*i_notval, code));
+
+                shared_ptr<Code> without_args = shared_ptr<Code>(new Code);
+                if (code->l) {
+                    without_args->l = shared_ptr<Lambda>(new Lambda);
+                    without_args->l->deep_copy_from(*code->l);
+                }
+                without_args->lit = code->lit;
+
+                d.insert(make_pair(*i_notval, without_args)); // DEBUG: 試験的
                 match_count++;
             } else {
                 if (!is_notation_variable(*i_notval) && code->args[i]->lit.val != *i_notval) return false;
@@ -395,7 +403,15 @@ match_code(
             if (*i_notval == exit_token) perdu = true;
             if (i_notval == config.beg) {
                 if (!is_notation_variable(*i_notval) && code->lit.val != *i_notval) return false;
-                if (res) res->insert(make_pair(*i_notval, code));
+                
+                shared_ptr<Code> without_args = shared_ptr<Code>(new Code);
+                if (code->l) {
+                    without_args->l = shared_ptr<Lambda>(new Lambda);
+                    without_args->l->deep_copy_from(*code->l);
+                }
+                without_args->lit = code->lit;
+                
+                if (res) res->insert(make_pair(*i_notval, without_args));
                 res_count++;
             } else {
                 if (!is_notation_variable(*i_notval) && code->args[i]->lit.val != *i_notval) return false;
