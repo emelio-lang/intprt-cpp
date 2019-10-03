@@ -403,7 +403,6 @@ continue_reduction_loop:
     return rf;
 }
 
-
 void reduction(shared_ptr<Code> code, bool silent) {
     auto back = cout.rdbuf();
     if (silent) {
@@ -553,7 +552,17 @@ ReductionFlow extract_all_notations(shared_ptr<Code> &code, ReductionFlow rf) {
 }
 
 
-void extract_all_notations(shared_ptr<Code> code) {
+void extract_all_notations(shared_ptr<Code> code, bool silent) {
+    auto back = cout.rdbuf();
+    if (silent) {
+        cout.rdbuf(NULL);
+    }
+
     ReductionFlow rf = {};
     extract_all_notations(code, rf);
+
+    if (silent) {
+        cout.rdbuf(back);
+    }
 }
+

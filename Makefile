@@ -28,6 +28,8 @@ emelio.o: emelio.cpp emelio.h util.h
 OBJS = tkutil.o tk.o util.o parse.o notation.o reduction.o transpile.o emelio.o 
 SML_OBJS = tkutil.o tk.o  util.o parse.o emelio.o
 
+compile: emelio
+	./emelio c test.em | gcc -lm -xc -Wall -o output -
 
 clean: 
 	rm *.cpp.cc

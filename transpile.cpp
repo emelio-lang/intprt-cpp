@@ -47,7 +47,7 @@ const char * c_head =
     "\n"
     "\n"
     "// built-in functions\n"
-    "void concat() {\n"
+    "inline void concat() {\n"
     "    char *a = *(sp-1);\n"
     "    char *b = *(sp-2);\n"
     "\n"
@@ -60,7 +60,7 @@ const char * c_head =
     "}\n"
     "\n"
     "\n"
-    "void add() {\n"
+    "inline void add() {\n"
     "    int a = atoi(top(sp)); mpop(sp);\n"
     "    int b = atoi(top(sp)); mpop(sp);\n"
     "\n"
@@ -69,7 +69,7 @@ const char * c_head =
     "    push(sp, tmp);\n"
     "}\n"
     "\n"
-    "void negate() {\n"
+    "inline void negate() {\n"
     "    int a = atoi(top(sp)); mpop(sp);\n"
     "\n"
     "    char *tmp = (char *) calloc(sizeof(char), (digit(-a) + 1));\n"
@@ -326,7 +326,7 @@ pair<string, string> c_s(shared_ptr<Code> c,
     }
 
     if (c->l) {
-        functions += "namespace {\n";
+        res += "{\n";
         
         for (auto n : c->l->argnames) {
             if (argstack.size() == 0) {
@@ -338,10 +338,10 @@ pair<string, string> c_s(shared_ptr<Code> c,
 
                 auto tmp = c_s(argstack.top(), vartable, {}, bind, varused_counter);
 
-                functions += tmp.second;
-                functions += "void " + n /*+ to_string(varused_counter[n])*/ + "() {\n";
-                functions += tmp.first;
-                functions += "}\n";
+                res += tmp.second;
+                res += "inline void " + n /*+ to_string(varused_counter[n])*/ + "() {\n";
+                res += tmp.first;
+                res += "}\n";
             
                 bind[vartable[n]] = argstack.top();
                 argstack.pop();
@@ -351,12 +351,12 @@ pair<string, string> c_s(shared_ptr<Code> c,
         auto tmp = c_s(c->l->body, vartable, argstack, bind, varused_counter);
 
         cout << "!!!" << endl;
-        cout << res  + tmp.first << "\n\n" << functions + tmp.second;
+        cout << res  + tmp.first << "\n\n" << res + tmp.second;
 
         res += tmp.first;
-        functions += tmp.second;
+        res += tmp.second;
 
-        functions += "}\n";
+        res += "}\n";
         
         return make_pair(res, functions);
     } else {
@@ -367,23 +367,23 @@ pair<string, string> c_s(shared_ptr<Code> c,
         if (c->lit.val == "negate") {
             cout << "関数適用 negate\n";
             auto tmp = c_s(argstack.top(), vartable, {}, bind, varused_counter);
-            res += tmp.first; functions += tmp.second; argstack.pop();
+            res += tmp.first; res += tmp.second; argstack.pop();
             res += "negate();\n";
         } else if (c->lit.val == "add") {
             cout << "関数適用 add\n";
             auto tmp = c_s(argstack.top(), vartable, {}, bind, varused_counter);
-            res += tmp.first; functions += tmp.second; argstack.pop();
+            res += tmp.first; res += tmp.second; argstack.pop();
             
             tmp = c_s(argstack.top(), vartable, {}, bind, varused_counter);
-            res += tmp.first; functions += tmp.second; argstack.pop();
+            res += tmp.first; res += tmp.second; argstack.pop();
             res += "add();\n";
         } else if (c->lit.val == "concat") {
             cout << "関数適用 concat\n";
             auto tmp = c_s(argstack.top(), vartable, {}, bind, varused_counter);
-            res += tmp.first; functions += tmp.second; argstack.pop();
+            res += tmp.first; res += tmp.second; argstack.pop();
             
             tmp = c_s(argstack.top(), vartable, {}, bind, varused_counter);
-            res += tmp.first; functions += tmp.second; argstack.pop();
+            res += tmp.first; res += tmp.second; argstack.pop();
             res += "concat();\n";
         } else if (c->lit.val == "fuse") {
             // cout << "関数適用 fuse\n";
@@ -426,7 +426,7 @@ pair<string, string> c_s(shared_ptr<Code> c,
             // argstack を全てぶちまける
             while (!argstack.empty()) {
                 auto tmp = c_s(argstack.top(), vartable, {}, bind, varused_counter);
-                res += tmp.first; functions += tmp.second; argstack.pop();
+                res += tmp.first; res += tmp.second; argstack.pop();
             }
 
             // if (varused_counter[c->lit.val] == 0) {
@@ -464,7 +464,7 @@ string transpile(shared_ptr<Code> c, const string dest) {
         rename_variables(c, {});
 
         auto tmp = c_s(c, vartable);
-        return c_head + tmp.first + tmp.second + c_tail;
+        return c_head + tmp.first + /*tmp.second + */c_tail;
     } else if (dest == "asm") {
         return asm_(c);
     }
