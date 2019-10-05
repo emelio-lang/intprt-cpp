@@ -64,6 +64,7 @@ struct Code {
     TknvalsRegion src;
 
     void deep_copy_from(const Code& other);
+    vector<string> plain_string();
 };
 
 struct Lambda {

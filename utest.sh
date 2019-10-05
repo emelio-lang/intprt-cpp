@@ -74,7 +74,7 @@ do
         echo $title
     fi
 
-    res=`./emelio a a <<< $code`
+    res=`./emelio a a a <<< $code`
     if [ "$res" = "$ans" ] ; then
         echo -e "\e[1;32mPassed.\e[0m"
 

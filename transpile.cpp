@@ -11,6 +11,7 @@
 #include "notation.h"
 
 const char * c_head =
+    "#include <stdbool.h>\n"
     "#include <stdio.h>\n"
     "#include <stdlib.h>\n"
     "#include <string.h>\n"
@@ -305,30 +306,39 @@ pair<string, string> c_s(shared_ptr<Code> c,
     
     cout << "#############################################################" << endl;
     cout << *c << endl << endl;
-    cout << "STACK: " <<endl;
-    auto tmp = argstack;
-    for (int i = 0; i < argstack.size(); i++) {
-        cout << *tmp.top() << endl << endl;
-        tmp.pop();
-    }
     cout << "BIND: " <<endl;
     for (auto tmp : vartable) {
         
         if (CONTAINS(bind, tmp.second))
             cout << tmp.first << " => " << *bind[tmp.second] << endl << endl;
     }
+    
     cout << endl << endl << endl;
     
     for (int i = c->args.size()-1; i >= 0; --i) {
+//        if (is_literal(c->args[i]->lit.val)) continue;
         argstack.push(c->args[i]);
         // res += c_(c->args[i], vartable);
         // stack_length++;
     }
 
+        cout << "STACK: " <<endl;
+    auto tmp = argstack;
+    for (int i = 0; i < argstack.size(); i++) {
+        cout << *tmp.top() << endl << endl;
+        tmp.pop();
+    }
+
+
     if (c->l) {
         res += "{\n";
         
         for (auto n : c->l->argnames) {
+            if (is_literal(n)) {
+                argstack.pop();
+                continue;
+            }
+
             if (argstack.size() == 0) {
             } else {
                 if (!CONTAINS(varused_counter, n)) varused_counter[n] = 1;
@@ -386,36 +396,46 @@ pair<string, string> c_s(shared_ptr<Code> c,
             res += tmp.first; res += tmp.second; argstack.pop();
             res += "concat();\n";
         } else if (c->lit.val == "fuse") {
-            // cout << "関数適用 fuse\n";
-            // auto f1 = argstack.top(); argstack.pop();
-            // auto f2 = argstack.top(); argstack.pop();
-            // stack<shared_ptr<Code>> tmp_argstack1 = argstack;
-            // stack<shared_ptr<Code>> tmp_argstack2 = argstack;
+            cout << "関数適用 fuse\n";
+            auto f1 = argstack.top(); argstack.pop();
+            auto f2 = argstack.top(); argstack.pop();
+            auto tmp_argstack1 = argstack;
+            auto tmp_argstack2 = argstack;
 
-            // // 引数を先に計算
-            // for (int i = 0; i < f1->l->argnames.size(); ++i)
-            //     res += c_(argstack.top(), vartable, {}, bind); argstack.pop();
+            // 引数を先に出しておく
+            for (int i = 0; i < f1->l->argnames.size(); ++i) {
+                auto tmp = c_s(argstack.top(), vartable, {}, bind, varused_counter);
+                res += tmp.first; res += tmp.second;
+                argstack.pop();
+            }
 
-            // res += "if (";
-            // for (int i = 0; i < f1->l->argnames.size(); ++i) {
-            //     if (is_literal(f1->l->argnames[i])) {
-            //         res += "strcmp(*(sp-" + to_string(1+i) + "), \""+f1->l->argnames[i]+"\") && ";
-            //     }
-            // }
-            // res += "true) {\n";
-            // res += c_(make_shared<Code>(Code{f1->l, ""}), vartable, tmp_argstack1, bind); // rf + 何か
-            // res += "}\n";
+            // 先に出した引数を見て分岐
+            res += "if (";
+            for (int i = 0; i < f1->l->argnames.size(); ++i) {
+                if (is_literal(f1->l->argnames[i])) {
+                    res += "strcmp(*(sp-" + to_string(f1->l->argnames.size()-i) + "), \""+f1->l->argnames[i]+"\") && ";
+                }
+            }
 
-            // res += "else if (";
-            // for (int i = 0; i < f2->l->argnames.size(); ++i) {
-            //     if (is_literal(f2->l->argnames[i])) {
-            //         res += "strcmp(*(sp-" + to_string(1+i) + "), \""+f2->l->argnames[i]+"\") && ";
-            //     }
-            // }
-            // res += "true) {\n";
-            // res += c_(make_shared<Code>(Code{f2->l, ""}), vartable, tmp_argstack2, bind); // rf + 何か
-            // res += "\n}\n";
+            res += "true) {\n";
+            auto tmp = c_s(f1, vartable, tmp_argstack1, bind, varused_counter);
+            res += tmp.first; res += tmp.second;
+            res += "}\n";
 
+            res += "else if (";
+            for (int i = 0; i < f2->l->argnames.size(); ++i) {
+                if (is_literal(f2->l->argnames[i])) {
+                    res += "strcmp(*(sp-" + to_string(f2->l->argnames.size()-i) + "), \""+f2->l->argnames[i]+"\") && ";
+                }
+            }
+            res += "true) {\n";
+            tmp = c_s(f2, vartable, tmp_argstack2, bind, varused_counter);
+            res += tmp.first; res += tmp.second;
+            res += "\n}\n";
+
+            for (int i = 0; i < f1->l->argnames.size(); ++i) {
+                res += "mpop(sp);\n";
+            }
         } else if (is_literal(c->lit.val) || (!is_literal(c->lit.val) && !CONTAINS(vartable, c->lit.val))) {
             // リテラル
             cout << "リテラル" + c->lit.val << endl;

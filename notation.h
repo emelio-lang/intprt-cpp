@@ -8,7 +8,7 @@
    ======================================================================== */
 
 struct Notation {
-    TknvalsRegion config;
+    vector<string> config;
     shared_ptr<Code> to;
 };
 

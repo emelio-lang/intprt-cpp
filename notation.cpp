@@ -84,8 +84,8 @@ bool apply_notation_greedily(shared_ptr<Code> &code, const Notation& notation) {
 
     int i = 0;
     int match_count = 0;
-    for (auto i_notval = notation.config.beg;
-         i_notval != notation.config.end;
+    for (auto i_notval = notation.config.begin();
+         i_notval != notation.config.end();
          i_notval++)
     {
         // NOTE: 大きさのチェックは最初にしたのでこのときのみがチェック対象
@@ -100,7 +100,7 @@ bool apply_notation_greedily(shared_ptr<Code> &code, const Notation& notation) {
             // NOTE: tmpにはいまからargsを入れていくので、空でないと駄目
             // 既存のargsからとってくる時は、argsとしてあるcodeにargsはないので面倒な処理をパスしている
             // おかしかったら下の方の[ERROR]が発動する
-            if (i_notval == notation.config.beg) {
+            if (i_notval == notation.config.begin()) {
                 tmp = shared_ptr<Code>(new Code);
                 tmp->l = code->l;
                 tmp->lit = code->lit;
@@ -130,7 +130,7 @@ bool apply_notation_greedily(shared_ptr<Code> &code, const Notation& notation) {
                     bool escape = true;
                     int j = 1;
                     while (true) {
-                        if (next(i_notval,j) == notation.config.end) {
+                        if (next(i_notval,j) == notation.config.end()) {
                             escape = false;
                             break;
                         }
@@ -157,7 +157,7 @@ bool apply_notation_greedily(shared_ptr<Code> &code, const Notation& notation) {
                 i++;
             }
         } else {
-            if (i_notval == notation.config.beg) {
+            if (i_notval == notation.config.begin()) {
                 if (!is_notation_variable(*i_notval) && code->lit.val != *i_notval) return false;
 
                 shared_ptr<Code> without_args = shared_ptr<Code>(new Code);
@@ -186,6 +186,13 @@ bool apply_notation_greedily(shared_ptr<Code> &code, const Notation& notation) {
     code = shared_ptr<Code> (new Code);
     code->deep_copy_from(*notation.to);
 
+    cout << "Matched with: ";
+    for (auto i_notval = notation.config.begin();
+         i_notval != notation.config.end();
+         i_notval++)
+        cout << *i_notval << " ";
+    cout << endl;
+
     cout << "before" << endl;
     cout << *code << endl << endl;
 
@@ -202,15 +209,15 @@ bool apply_notation_greedily(shared_ptr<Code> &code, const Notation& notation) {
     return true;
 }
 
-bool check_match_code(TknvalsRegion config, const shared_ptr<Code> &code, int index, bool ignore_first_free_variable) {
-    if (ignore_first_free_variable && is_notation_free_variable(*config.beg)) {
-        config.beg++;
+bool check_match_code(vector<string> config, const shared_ptr<Code> &code, int index, bool ignore_first_free_variable) {
+    if (ignore_first_free_variable && is_notation_free_variable(config.front())) {
+        config.begin()++;
     }
 
     int res_count = 0;
     int i = index;
-    for (auto i_notval = config.beg;
-         i_notval != config.end;
+    for (auto i_notval = config.begin();
+         i_notval != config.end();
          i_notval++)
     {
         // NOTE: 大きさのチェックは最初にしたのでこのときのみがチェック対象
@@ -220,7 +227,7 @@ bool check_match_code(TknvalsRegion config, const shared_ptr<Code> &code, int in
         // 文字列を集めてパースただし、関数が潜んでいた場合... = add (f 3) 2;とか
         if (is_notation_free_variable(*i_notval)) {
             int start = i;
-            if (i_notval != config.beg) {
+            if (i_notval != config.begin()) {
                 i++;
             }
 
@@ -235,7 +242,7 @@ bool check_match_code(TknvalsRegion config, const shared_ptr<Code> &code, int in
                     bool escape = true;
                     int j = 1;
                     while (true) {
-                        if (next(i_notval,j) == config.end) {
+                        if (next(i_notval,j) == config.end()) {
                             escape = false;
                             break;
                         }
@@ -260,7 +267,7 @@ bool check_match_code(TknvalsRegion config, const shared_ptr<Code> &code, int in
                 i++;
             }
         } else {
-            if (i_notval == config.beg && !ignore_first_free_variable) {
+            if (i_notval == config.begin() && !ignore_first_free_variable) {
                 if (!is_notation_variable(*i_notval) && code->lit.val != *i_notval) return false;
                 res_count++;
             } else {
@@ -278,7 +285,7 @@ bool check_match_code(TknvalsRegion config, const shared_ptr<Code> &code, int in
 
 bool
 match_code(
-    TknvalsRegion config,
+    vector<string> config,
     const shared_ptr<Code> &code,
     map<string, shared_ptr<Code>> *res,
     vector<shared_ptr<Code>> *remains = NULL
@@ -286,10 +293,10 @@ match_code(
 {
     string exit_token = "";
     {
-        auto i_notval = config.beg;
+        auto i_notval = config.begin();
         while (is_notation_variable(*i_notval) || is_notation_free_variable(*i_notval)) {
             i_notval++;
-            if (i_notval == config.end) {
+            if (i_notval == config.end()) {
                 cout << "[ERROR] notationのexit_tokenが見つかりませんでした" << endl;
                 break;
             }
@@ -301,8 +308,8 @@ match_code(
     int i = 0;
     bool perdu = false;
     bool remain = false;
-    for (auto i_notval = config.beg;
-         i_notval != config.end;
+    for (auto i_notval = config.begin();
+         i_notval != config.end();
          i_notval++)
     {
         // NOTE: 大きさのチェックは最初にしたのでこのときのみがチェック対象
@@ -323,7 +330,7 @@ match_code(
             // NOTE: tmpにはいまからargsを入れていくので、空でないと駄目
             // 既存のargsからとってくる時は、argsとしてあるcodeにargsはないので面倒な処理をパスしている
             // おかしかったら下の方の[ERROR]が発動する
-            if (i_notval == config.beg) {
+            if (i_notval == config.begin()) {
                 tmp = shared_ptr<Code>(new Code);
                 tmp->l = code->l;
                 tmp->lit = code->lit;
@@ -354,7 +361,7 @@ match_code(
                     bool escape = true;
                     int j = 1;
                     while (true) {
-                        if (next(i_notval,j) == config.end) {
+                        if (next(i_notval,j) == config.end()) {
                             escape = false;
                             break;
                         }
@@ -377,7 +384,7 @@ match_code(
                 }
 
 
-                if (perdu && code->args[i]->lit.val == exit_token && prev(config.end) == i_notval) {
+                if (perdu && code->args[i]->lit.val == exit_token && prev(config.end()) == i_notval) {
                     // もしかしたら同じnotationがもう一回繰り返しているかもしれない --> チェックする
                     if (check_match_code(config, code, i, true)) {
                         // 繰り返しているならその直前で辞める
@@ -401,7 +408,7 @@ match_code(
             }
         } else {
             if (*i_notval == exit_token) perdu = true;
-            if (i_notval == config.beg) {
+            if (i_notval == config.begin()) {
                 if (!is_notation_variable(*i_notval) && code->lit.val != *i_notval) return false;
                 
                 shared_ptr<Code> without_args = shared_ptr<Code>(new Code);
@@ -445,6 +452,14 @@ bool apply_notation(shared_ptr<Code> &code, const Notation& notation) {
     // fruit.deep_copy_from(notation.to);
     code = shared_ptr<Code> (new Code);
     code->deep_copy_from(*notation.to);
+
+
+    cout << "Matched with: ";
+    for (auto i_notval = notation.config.begin();
+         i_notval != notation.config.end();
+         i_notval++)
+        cout << *i_notval << " ";
+    cout << endl;
 
     cout << "before" << endl;
     cout << *code << endl << endl;

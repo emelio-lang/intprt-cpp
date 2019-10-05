@@ -54,13 +54,15 @@ int main(int argc, char **argv) {
         shared_ptr<Code> root = code(pf);
 //        cout << *root << endl;
         
-        extract_all_notations(root, true);
+        extract_all_notations(root, false);
 
-        cout << transpile(root, "c");
-//         reduction(root);
+//        cout << *root << endl;
+
+//        cout << transpile(root, "c");
+//        reduction(root);
 
         
-//         cout << *root << endl;
+         cout << *root << endl;
 
 
         return 0;

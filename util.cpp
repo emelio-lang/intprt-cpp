@@ -33,6 +33,27 @@
 //     }
 // }
 
+vector<string> Code::plain_string() {
+    vector<string> res = {};
+
+    if (this->lit.val != "") res.push_back(this->lit.val);
+
+    for (auto a : this->args) {
+        vector<string> const tmp = a->plain_string();
+        res.reserve(res.size() + distance(tmp.begin(),tmp.end()));
+        res.insert(res.end(),tmp.begin(),tmp.end());
+    }
+
+    if (this->l) {
+        vector<string> const tmp = this->l->body->plain_string();
+        res.reserve(res.size() + distance(tmp.begin(),tmp.end()));
+        res.insert(res.end(),tmp.begin(),tmp.end());
+    }
+
+    return res;
+}
+
+
 void Code::deep_copy_from(const Code& other) {
     lit = other.lit;
     src = other.src;

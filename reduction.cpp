@@ -19,6 +19,7 @@ int ReductionCounter = 0;
 {- BUILTIN_2 <> add -}
 {- BUILTIN_2 <> concat -}
 
+enum NotationType { LEFT, RIGHT };
 
 struct ReductionFlow {
     map<string, shared_ptr<Code>> bind = {
@@ -29,8 +30,7 @@ struct ReductionFlow {
     stack<shared_ptr<Code>> argstack;
     // NOTE: 未計算のままshadowingするために必要
     map<string, string> shadower;
-    vector<Notation> notations;
-    vector<Notation> greedy_notations;
+    vector<pair<Notation, NotationType>> notations;
 };
 
 
@@ -63,7 +63,6 @@ static inline void rmvparen(TknvalsRegion &r) {
     if (*r.beg == "(") r.beg++;
     if (*prev(r.end) == ")") r.end--;
 }
-
 
 pair<int,bool> read_int_litcode(const shared_ptr<Code> c) {
     if (!is_computed(c)) {
@@ -122,6 +121,35 @@ shared_ptr<Code> ref(string name, ReductionFlow &rf) {
     return rf.bind[name];
 }
 #define ref(a) ref(a,rf)
+
+
+bool apply_all_notations(shared_ptr<Code> &code,
+                         const vector<pair<Notation,NotationType>> &notations,
+                         bool rv = false
+                         )
+{
+
+    
+    bool reapply = false;
+    {
+        auto n = notations.begin();
+        while (n != notations.end()) {
+            switch (n->second) {
+                case RIGHT:
+                    reapply = apply_notation_greedily(code, n->first);
+                    break;
+                case LEFT:
+                    reapply = apply_notation(code, n->first);
+                    break;
+            }
+            n++;
+        }
+    }
+
+    if (reapply) apply_all_notations(code, notations, true);
+    return rv;
+}
+
 
 void resolve_fusion(shared_ptr<Code> &code, const ReductionFlow &rf) {
     stack<shared_ptr<Code>> _argstack = rf.argstack;
@@ -182,25 +210,7 @@ continue_reduction_loop:
         ReductionCounter++;
 
         // Apply notations
-        {
-            bool reapply = false;
-            {
-                auto n = rf.greedy_notations.begin();
-                while (n != rf.greedy_notations.end()) {
-                    reapply = apply_notation_greedily(code, *n);
-                    n++;
-                }
-            }
-            {
-                auto n = rf.notations.begin();
-                while (n != rf.notations.end()) {
-                    reapply = apply_notation(code, *n);
-                    n++;
-                }
-            }
-
-            if (reapply) continue;
-        }
+        apply_all_notations(code, rf.notations);
         // {
         //     auto n = rf.notations.end();
         //     while (n != rf.notations.begin()) {
@@ -270,13 +280,13 @@ continue_reduction_loop:
                     //     to_code = ::code(pf);
                     // }
 
-                    TknvalsRegion conf = code->args[0]->src;
-                    rmvparen(conf);
+                    vector<string> conf = code->args[0]->plain_string();
+//                    rmvparen(conf);
 
                     if (code->lit.val == "notation") {
-                        rf.notations.push_back(Notation {conf, to_code});
+                        rf.notations.push_back(make_pair(Notation {conf, to_code}, LEFT));
                     } else if (code->lit.val == "gnotation") {
-                        rf.greedy_notations.push_back(Notation {conf, to_code});
+                        rf.notations.push_back(make_pair(Notation {conf, to_code}, RIGHT));
                     }
 
                     // DEBUG
@@ -419,59 +429,6 @@ void reduction(shared_ptr<Code> code, bool silent) {
     }
 }
 
-bool check_all_notations(shared_ptr<Code> code,
-                         const vector<Notation> &notations,
-                         const vector<Notation> &gnotations
-                         )
-{
-    bool reapply = false;
-    {
-        auto n = gnotations.begin();
-        while (n != gnotations.end()) {
-            reapply = apply_notation_greedily(code, *n);
-            n++;
-        }
-    }
-    {
-        auto n = notations.begin();
-        while (n != notations.end()) {
-            reapply = apply_notation(code, *n);
-            n++;
-        }
-    }
-
-//    if (reapply) apply_all_notations(code, notations, gnotations, true);
-
-    return reapply;
-}
-
-bool apply_all_notations(shared_ptr<Code> &code,
-                         const vector<Notation> &notations,
-                         const vector<Notation> &gnotations,
-                         bool rv = false
-                         )
-{
-    bool reapply = false;
-    {
-        auto n = gnotations.begin();
-        while (n != gnotations.end()) {
-            reapply = apply_notation_greedily(code, *n);
-            n++;
-        }
-    }
-    {
-        auto n = notations.begin();
-        while (n != notations.end()) {
-            reapply = apply_notation(code, *n);
-            n++;
-        }
-    }
-
-    if (reapply) apply_all_notations(code, notations, gnotations, true);
-
-    return rv;
-}
-
 
 ReductionFlow extract_all_notations(shared_ptr<Code> &code, ReductionFlow rf) {
     cout << *code << endl << endl;
@@ -479,8 +436,9 @@ ReductionFlow extract_all_notations(shared_ptr<Code> &code, ReductionFlow rf) {
     // これはまだ続くのかどうか TODO 一貫性
 //    if (check_all_notations(code, rf.notations, rf.greedy_notations)) return rf;
 
+
     // Apply notations
-    apply_all_notations(code, rf.notations, rf.greedy_notations);
+    apply_all_notations(code, rf.notations);
 
     if (!code->l) {
         if (is_literal(code->lit.val)) {
@@ -510,14 +468,27 @@ ReductionFlow extract_all_notations(shared_ptr<Code> &code, ReductionFlow rf) {
                 //     to_code = ::code(pf);
                 // }
 
-                TknvalsRegion conf = code->args[0]->src;
-                rmvparen(conf);
+                vector<string> conf = code->args[0]->plain_string();
+                for (auto e : conf) cout << e << " "; 
+                cout << endl;
+//                rmvparen(conf);
 
                 if (code->lit.val == "notation") {
-                    rf.notations.push_back(Notation {conf, to_code});
+                    rf.notations.push_back(make_pair(Notation {conf, to_code}, LEFT));
                 } else if (code->lit.val == "gnotation") {
-                    rf.greedy_notations.push_back(Notation {conf, to_code});
+                    rf.notations.push_back(make_pair(Notation {conf, to_code}, RIGHT));
                 }
+
+                cout << "There now notations like: \n";
+                for (auto notation : rf.notations) {
+                    for (auto i_notval = notation.first.config.begin();
+                         i_notval != notation.first.config.end();
+                         i_notval++)
+                        cout << *i_notval << " ";
+                    cout << endl;
+                }
+                cout << endl;
+
 
                 // DEBUG
                 // TODO: ここで前のやつと繋げないといけなさそう
