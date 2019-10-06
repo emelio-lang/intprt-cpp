@@ -1,18 +1,7 @@
-(gnotation (notation As =>> Bs ; Cs) (notation (As) Bs Cs) (
-(gnotation (gnotation As =>> Bs ; Cs) (gnotation (As) Bs Cs) (
-(gnotation (let A: TYPEs = Bs ; Cs) ((|A| Cs) (Bs)) (
-(gnotation (let A = Bs ; Cs) ((|A| Cs) (Bs)) (
-(gnotation (As ; Bs) ((|x| Bs) (As)) (
-    gnotation As $ Bs =>> As Bs;
-    notation A - Bs   =>> subtract A Bs;
-
-    let subtract = (|a b|
-        add a $ negate b
-    );
-
-    let a = -3;
-    a
-))
-))
-))
+(gnotation ([ A, B, Cs ]) ([(fuse A B), Cs]) (
+(gnotation ([ A, B ]) (fuse A B) (
+[ (|tomato| 100)
+, (|banana| 80)
+, (|grapes| 300)
+]
 ))))

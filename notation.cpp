@@ -70,6 +70,19 @@ void replace_code(shared_ptr<Code> c, const map<string, shared_ptr<Code>> &d) {
     }
 }
 
+
+
+/*
+  基本的には次のように
+ */
+bool match_notation_greedily(shared_ptr<Code> &code, const Notation &notation) {
+    // first, check length
+    if (code->args.size()+1 < notation.config.size())
+        return false;
+
+    map<string, shared_ptr<Code>> d;
+}
+
 // TODO: notation適用後のsrcがおかしいせいでバグってる
 // TODO: 上の問題の解決のため、まずは適用する時に無駄な関数が一枚噛まされているのを直したい
 bool apply_notation_greedily(shared_ptr<Code> &code, const Notation& notation) {
@@ -242,12 +255,17 @@ bool check_match_code(vector<string> config, const shared_ptr<Code> &code, int i
                     bool escape = true;
                     int j = 1;
                     while (true) {
+                        cout << distance(next(i_notval,j), config.end())  << endl;
+                        // もう最後まで来てるなら次へ
                         if (next(i_notval,j) == config.end()) {
                             escape = false;
                             break;
                         }
+                        
 //                        if (next(i_notval,j) == config.end) break;
+                        // 自由変数なら次へ
                         if (is_notation_free_variable(*next(i_notval,j))) break;
+                        // トークンなら
                         if (!is_notation_variable(*next(i_notval,j))) {
                             if (code->args[i+j-1]->lit.val != *next(i_notval,j)) {
                                 escape = false;
