@@ -11,7 +11,7 @@ TIMEFMT='%J   %U  user %S system %P cpu %*E total'$'\n'\
 TESTCASES='testcases/testcases.em'
 TESTCASES_DIRECTORY='testcases'
 
-line_count=`cat $TESTCASES | wc -l`
+line_count=`cat $TESTCASES | wc -l | sed -e 's/ //g'`
 
 if [ "$1" = "v" ] ; then
     echo "wwwwwww TESTING wwwwwwww"
