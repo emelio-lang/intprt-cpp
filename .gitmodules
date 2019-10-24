@@ -1,0 +1,3 @@
+[submodule "Tokenizer"]
+	path = Tokenizer
+	url = https://github.com/CreativeGP/Tokenizer.git
