@@ -116,6 +116,10 @@ bool is_literal(const std::string& s) {
     return is_number(s);
 }
 
+bool is_builtin(const std::string& s) {
+    return s == "add" || s == "negate" || s == "concat";
+}
+
 
 vector<string> split(const string &s, char delim) {
     vector<string> elems;

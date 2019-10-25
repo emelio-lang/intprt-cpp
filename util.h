@@ -31,6 +31,7 @@ std::basic_string<Char, Traits, Allocator> operator *
 
 bool is_number(const std::string& s);
 bool is_literal(const std::string& s);
+bool is_builtin(const std::string& s);
 
 bool is_computed(const shared_ptr<Code> &c);
 

@@ -1,6 +1,7 @@
 emelio
 memo.md
 .vscode/
+.DS_Store
 
 # Prerequisites
 *.d

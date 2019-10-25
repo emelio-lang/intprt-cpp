@@ -27,6 +27,9 @@
 #define CONTAINS(c,v) ((c).find(v) != (c).end())
 #define REFEQUAL(a,b) (&(a) == &(b))
 #define INDEXOF(c,v) (distance((c).begin(), find((c).begin(), (c).end(), v)))
+#define FOR(i,a,b) for(int i=a;i<b;++i)
+#define REP(i,n) FOR(i,0,n)
+
 
 #define internal_global static
 #define persistent static

@@ -10,12 +10,14 @@
 #include "util.h"
 #include "notation.h"
 
+// 変数の名前かどうか
 inline bool is_notation_variable(const string& s) {
     bool res = true;
     for (char c : s) if (!isupper(c)) res = false;
     return res;
 }
 
+// 自由変数の名前かどうか
 inline bool is_notation_free_variable(const string& s) {
     bool res = true;
     for (int i = 0; i < s.size()-1; ++i)
@@ -24,45 +26,59 @@ inline bool is_notation_free_variable(const string& s) {
     return res;
 }
 
-// NOTE: 左右に変数がない場合、適当な文字を入れ込みます
-void pad_notation_config(vector<string>& config) {
-    if (!is_notation_variable(config[0])) {
-        config.insert(config.begin(), random_saneupper_string(16));
-    }
-    if (!is_notation_variable(config.back())) {
-        config.push_back(random_saneupper_string(16));
+
+// 自由変数が最初にある時以外、定義が(λ <add>)[(λ <4>)[],(λ <8>)[],]として解釈しなければならないところが、
+// [(λ <add>)[],(λ <4>)[],(λ <8>)[],]として流れてくるのを修正する
+void fix_defs_fv(map<string, shared_ptr<Code>> &defs) {
+    for (auto& [key, val] : defs) {
+        if (is_notation_free_variable(key) && val->lit.val == "" && !val->l) {
+            shared_ptr<Code> newcode = make_shared<Code>(*val->args[0]);
+            copy(val->args.begin()+1,
+                 val->args.end(),
+                 back_inserter(newcode->args));
+            val = newcode;
+        }
     }
 }
 
+// 変数名で記述されたコード c に定義セット d を代入していく
 void replace_code(shared_ptr<Code> c, const map<string, shared_ptr<Code>> &d) {
     if (c->l) {
         for (string &a : c->l->argnames) {
             if (CONTAINS(d, a)) {
-                a = d.at(a)->lit.val; // ?
+                /* 引数名も変える(おそらく、ただの変数として定義されているはずなのでそのままlitを引っ張り出す)
+
+                   ex.
+                   (|A| ... ) { A => (λ <windows>)[] }
+                   を
+                   (|windows| ...)
+                   に変換
+                */
+                a = d.at(a)->lit.val; 
             }
         }
 
         replace_code(c->l->body, d);
     } else if (c->lit.val != "") {
-        if (CONTAINS(d, c->lit.val) &&
-            (is_notation_variable(c->lit.val) || is_notation_free_variable(c->lit.val))
-            )
-        {
-            if (c->args.size() == 0) { // TODO: どういう意図？
+        if (CONTAINS(d, c->lit.val) && (is_notation_variable(c->lit.val) || is_notation_free_variable(c->lit.val))) {
+            /*
+              変数の書換
+              ・引数がない場合はそのまま置き換える
+              ・引数があれば（つまり、Code { lit = 変数名, args = 存在, l = null }になっているはず)
+              　lに新しくLambdaを作って、そのbodyとして定義を代入する
+            */
+            if (c->args.size() == 0) {
                 *c = *d.at(c->lit.val);
                 return;
             } else {
-                if (!c->l)
-                    c->l = shared_ptr<Lambda>(new Lambda);
-            
+                if (c->l) cout << "[GIWAKU] どうやってやったんだ..." << endl;
+
+                c->l = shared_ptr<Lambda>(new Lambda);
                 c->l->body = make_shared<Code>(*d.at(c->lit.val));
-                // else
-                //     c->l = shared_ptr<Lambda>(nullptr);
-                // c->lit = d.at(c->lit.val)->lit;
             }
         }
     }
-
+            
     
 //    for (auto &a : c->args) {
     for (int i = 0; i < c->args.size(); ++i) {
@@ -70,151 +86,179 @@ void replace_code(shared_ptr<Code> c, const map<string, shared_ptr<Code>> &d) {
     }
 }
 
+// [notationのマッチ関数] 変数にマッチ
+shared_ptr<Code> match_variable(shared_ptr<Code> &c, int &index, bool checkonly) {
 
-
-/*
-  基本的には次のように
- */
-bool match_notation_greedily(shared_ptr<Code> &code, const Notation &notation) {
-    // first, check length
-    if (code->args.size()+1 < notation.config.size())
-        return false;
-
-    map<string, shared_ptr<Code>> d;
-}
-
-// TODO: notation適用後のsrcがおかしいせいでバグってる
-// TODO: 上の問題の解決のため、まずは適用する時に無駄な関数が一枚噛まされているのを直したい
-bool apply_notation_greedily(shared_ptr<Code> &code, const Notation& notation) {
-    // first, check length
-    if (code->args.size()+1 < notation.config.size())
-        return false;
-
-
-    map<string, shared_ptr<Code>> d;
-    // if (!is_notation_variable(*notation.config.beg) && code->lit.val != *notation.config.beg) return;
-    // d.insert(make_pair(*notation.config.beg, code));
-
-    int i = 0;
-    int match_count = 0;
-    for (auto i_notval = notation.config.begin();
-         i_notval != notation.config.end();
-         i_notval++)
-    {
-        // NOTE: 大きさのチェックは最初にしたのでこのときのみがチェック対象
-        if (i >= code->args.size()) break;
-
-        // free variable
-        // 文字列を集めてパースただし、関数が潜んでいた場合... = add (f 3) 2;とか
-        if (is_notation_free_variable(*i_notval)) {
-            int start = i;
-            shared_ptr<Code> tmp;
-
-            // NOTE: tmpにはいまからargsを入れていくので、空でないと駄目
-            // 既存のargsからとってくる時は、argsとしてあるcodeにargsはないので面倒な処理をパスしている
-            // おかしかったら下の方の[ERROR]が発動する
-            if (i_notval == notation.config.begin()) {
-                tmp = shared_ptr<Code>(new Code);
-                tmp->l = code->l;
-                tmp->lit = code->lit;
-                // codeの引数を抜かした部分のsrcが欲しい
-                if (code->l) tmp->src = code->l->body->src;
-                else tmp->src = TknvalsRegion {code->src.beg, next(code->src.beg)};
-                
-            } else {
-                tmp = make_shared<Code>(*code->args[i]);
-                i++;
-            }
-
-            if (tmp->args.size() != 0) {
-                cout << "[ERROR] 何かがおかしい" << endl;
-            }
-
-            while (true) {
-                if (i >= code->args.size())
-                {
-                    d.insert(make_pair(*i_notval, tmp));
-                    match_count++;
-                    break;
-                }
-
-                // DEBUG: As A = Bsとかは読み込める？
-                {
-                    bool escape = true;
-                    int j = 1;
-                    while (true) {
-                        if (next(i_notval,j) == notation.config.end()) {
-                            escape = false;
-                            break;
-                        }
-                        if (is_notation_free_variable(*next(i_notval,j))) break;
-                        if (!is_notation_variable(*next(i_notval,j))) {
-                            if (code->args[i+j-1]->lit.val != *next(i_notval,j)) {
-                                escape = false;
-                                break;
-                            }
-                        }
-                        j++;
-                    }
-
-                    if (escape) {
-                        d.insert(make_pair(*i_notval, tmp));
-                        match_count++;
-                        break;
-                    }
-                }
-
-                tmp->args.push_back(code->args[i]);
-                tmp->src.end = code->args[i]->src.end;
-                
-                i++;
-            }
+    if (index == 0) {
+        cout << "variable: " << *c << endl;
+        index++;
+        return c;
+    } else {
+        if (c->args.size() < index)
+        {
+            index = -1;
+            return c;
         } else {
-            if (i_notval == notation.config.begin()) {
-                if (!is_notation_variable(*i_notval) && code->lit.val != *i_notval) return false;
-
-                shared_ptr<Code> without_args = shared_ptr<Code>(new Code);
-                if (code->l) {
-                    without_args->l = shared_ptr<Lambda>(new Lambda);
-                    without_args->l->deep_copy_from(*code->l);
-                }
-                without_args->lit = code->lit;
-
-                d.insert(make_pair(*i_notval, without_args)); // DEBUG: 試験的
-                match_count++;
-            } else {
-                if (!is_notation_variable(*i_notval) && code->args[i]->lit.val != *i_notval) return false;
-                d.insert(make_pair(*i_notval, code->args[i]));
-                match_count++;
-                i++;
-            }
+            cout << "variable: " << *c->args[index-1] << endl;
+            return c->args[(index++)-1];
         }
     }
+}
 
-    // 十分にマッチできていない
-    if (match_count/*d.size()NOTE:重複でうまく働かないのでカウンタ*/ != notation.config.size()) return false;
+// [notationのマッチ関数] 自由変数にマッチ
+shared_ptr<Code> match_free_variable(shared_ptr<Code> &c, const vector<string> &rest_config, int &index, bool checkonly) {
+    // 最後までtmpという新しいCodeを作ってその引数に入れていく
+    shared_ptr<Code> tmp;
 
-// Code fruit;
-    // fruit.deep_copy_from(notation.to);
+    if (index == 0) {
+        tmp = shared_ptr<Code>(new Code);
+        tmp->l = c->l;
+        tmp->lit = c->lit;
+
+        // TODO: srcを変えるなら前と同じようにここで
+    } else {
+        tmp = make_shared<Code>(*c->args[index-1]);
+    }
+
+    index++;
+    
+    for (auto e = next(c->args.begin(), index-1); e != c->args.end(); e++) {
+        if (check_match_notation(c, rest_config, index)) {
+            return tmp;
+        }
+        tmp->args.push_back(*e);
+        index++;
+    }
+
+    cout << "Free variable: " << *tmp << endl;
+    
+    return tmp;
+}
+
+// [notationのマッチ関数] 変数に貪欲にマッチ
+shared_ptr<Code>
+match_free_variable_greedily(shared_ptr<Code> &c, int &index, bool checkonly) {
+    // 最後までtmpという新しいCodeを作ってその引数に入れていく
+    shared_ptr<Code> tmp = shared_ptr<Code>(new Code);
+
+    if (index == 0) {
+        tmp->args.push_back(c);
+        index ++;
+    }
+    
+    for (auto e = next(c->args.begin(), index-1); e != c->args.end(); e++) {
+        tmp->args.push_back(*e);
+        index++;
+    }
+
+    cout << "Free variable: " << *tmp << endl;
+    
+    return tmp;
+}
+
+// [notationのマッチ関数] 指定されたトークンにマッチ
+shared_ptr<Code> match_token(shared_ptr<Code> &c, string token, int &index, bool checkonly) {
+    if (index == 0) {
+        if (c->lit.val != token) {
+            index = -1;
+            return c;
+        } else {
+            cout << "Token: " << *c << endl;
+        
+            index ++;
+            return c;
+        }
+    } else {
+        if (c->args.size() < index ||
+            c->args[index-1]->lit.val != token)
+        {
+            index = -1;
+            return c;
+        } else {
+        
+            cout << "Token: " << *c->args[index-1] << endl;
+            return c->args[(index++)-1];
+        }
+    }
+}
+
+// コード c にnotationを適用する
+bool apply_notation(shared_ptr<Code> &code, const Notation &notation) {
+    // length check ?
+
+    // map<string, shared_ptr<Code>> d;
+    // int hayidx = 0;
+    // for (auto c : notation.config) {
+    //     if (is_notation_variable(c)) {
+    //         d[c] = match_variable(code, hayidx, false);
+    //     } else if (is_notation_free_variable(c)) {
+    //         d[c] = match_free_variable(code, hayidx, false);
+    //     } else {
+    //         d[c] = match_token(code, hayidx, false);
+    //     }
+
+    //     if (hayidx == -1) return false;
+    // }
+
+    return true;
+}
+
+// gnotationがcodeにマッチするかどうか
+// するなら(定義セット, true)を返す
+tuple<map<string, shared_ptr<Code>>, vector<shared_ptr<Code>>, bool>
+match_notation_greedily(shared_ptr<Code> &code, const vector<string> &config) {
+    map<string, shared_ptr<Code>> d;
+    int hayidx = 0;
+    
+    for (auto c = config.begin(); c != config.end(); ++c) {
+        if (is_notation_variable(*c)) {
+            d[*c] = match_variable(code, hayidx, false);
+        } else if (is_notation_free_variable(*c)) {
+            if (c == prev(config.end())) {
+                d[*c] = match_free_variable_greedily(code, hayidx, false);
+            } else {
+                d[*c] = match_free_variable(code, vector<string>(next(c), config.end()), hayidx, false);
+            }
+        } else {
+            d[*c] = match_token(code, *c, hayidx, false);
+        }
+
+        if (hayidx == -1) return make_tuple(d, vector<shared_ptr<Code>>(), false);
+    }
+
+    cout << "doen" << endl;
+    
+    return make_tuple(d, vector<shared_ptr<Code>>(next(code->args.begin(), hayidx-1), code->args.end()), true);
+}
+
+// codeにgnotationを適用する
+bool apply_notation_greedily(shared_ptr<Code> &code, const Notation &notation) {
+    // length check ?
+
+    map<string, shared_ptr<Code>> defs;
+    vector<shared_ptr<Code>> remains;
+
+    {
+        auto tmp = match_notation_greedily(code, notation.config);
+        if (!get<2>(tmp)) return false;
+        defs = get<0>(tmp);
+        remains = get<1>(tmp);
+    }
+
     code = shared_ptr<Code> (new Code);
     code->deep_copy_from(*notation.to);
-
-    cout << "Matched with: ";
-    for (auto i_notval = notation.config.begin();
-         i_notval != notation.config.end();
-         i_notval++)
-        cout << *i_notval << " ";
-    cout << endl;
 
     cout << "before" << endl;
     cout << *code << endl << endl;
 
-    for (auto it = d.begin(); it != d.end(); it++) {
+    for (auto it = defs.begin(); it != defs.end(); it++) {
         cout << "{" << it->first << "}" << endl;
         cout << *it->second << endl << endl;
     }
 
-    replace_code(code, d);
+    fix_defs_fv(defs);
+    replace_code(code, defs);
+    copy(remains.begin(), remains.end(), std::back_inserter(code->args));
 
     cout<< "after" << endl;
     cout << *code << endl << endl;
@@ -222,287 +266,27 @@ bool apply_notation_greedily(shared_ptr<Code> &code, const Notation& notation) {
     return true;
 }
 
-bool check_match_code(vector<string> config, const shared_ptr<Code> &code, int index, bool ignore_first_free_variable) {
-    if (ignore_first_free_variable && is_notation_free_variable(config.front())) {
-        config.begin()++;
-    }
-
-    int res_count = 0;
-    int i = index;
-    for (auto i_notval = config.begin();
-         i_notval != config.end();
-         i_notval++)
-    {
-        // NOTE: 大きさのチェックは最初にしたのでこのときのみがチェック対象
-        if (i >= code->args.size()) break;
-
-        // free variable
-        // 文字列を集めてパースただし、関数が潜んでいた場合... = add (f 3) 2;とか
-        if (is_notation_free_variable(*i_notval)) {
-            int start = i;
-            if (i_notval != config.begin()) {
-                i++;
-            }
-
-            while (true) {
-                if (i >= code->args.size())
-                {
-                    res_count++;
-                    break;
-                }
-
-                {
-                    bool escape = true;
-                    int j = 1;
-                    while (true) {
-                        cout << distance(next(i_notval,j), config.end())  << endl;
-                        // もう最後まで来てるなら次へ
-                        if (next(i_notval,j) == config.end()) {
-                            escape = false;
-                            break;
-                        }
-                        
-//                        if (next(i_notval,j) == config.end) break;
-                        // 自由変数なら次へ
-                        if (is_notation_free_variable(*next(i_notval,j))) break;
-                        // トークンなら
-                        if (!is_notation_variable(*next(i_notval,j))) {
-                            if (code->args[i+j-1]->lit.val != *next(i_notval,j)) {
-                                escape = false;
-                                break;
-                            }
-                        }
-                        j++;
-                    }
-
-                    if (escape) {
-                        res_count++;
-                        break;
-                    }
-                }
-
-                
-                i++;
-            }
-        } else {
-            if (i_notval == config.begin() && !ignore_first_free_variable) {
-                if (!is_notation_variable(*i_notval) && code->lit.val != *i_notval) return false;
-                res_count++;
-            } else {
-                if (!is_notation_variable(*i_notval) && code->args[i]->lit.val != *i_notval) return false;
-                res_count++;
-                i++;
-            }
-        }
-    }
-
-    // 十分にマッチできていない
-    return res_count == config.size();
-}
-
-
 bool
-match_code(
-    vector<string> config,
-    const shared_ptr<Code> &code,
-    map<string, shared_ptr<Code>> *res,
-    vector<shared_ptr<Code>> *remains = NULL
-           )
-{
-    string exit_token = "";
-    {
-        auto i_notval = config.begin();
-        while (is_notation_variable(*i_notval) || is_notation_free_variable(*i_notval)) {
-            i_notval++;
-            if (i_notval == config.end()) {
-                cout << "[ERROR] notationのexit_tokenが見つかりませんでした" << endl;
-                break;
-            }
-        }
-        exit_token = *i_notval;
-    }
+check_match_notation (shared_ptr<Code> &code, const vector<string> &config, int index) {
+    // // length check ?
 
-    int res_count = 0;
-    int i = 0;
-    bool perdu = false;
-    bool remain = false;
-    for (auto i_notval = config.begin();
-         i_notval != config.end();
-         i_notval++)
-    {
-        // NOTE: 大きさのチェックは最初にしたのでこのときのみがチェック対象
-        if (i >= code->args.size()) break;
-        if (remain) {
-            remains->push_back(code->args[i]);
-            i_notval--; // NOTE: remain処理のためforループ脱出防止
-            i++;
-            continue;
-        }
-
-        // free variable
-        // 文字列を集めてパースただし、関数が潜んでいた場合... = add (f 3) 2;とか
-        if (is_notation_free_variable(*i_notval)) {
-            int start = i;
-            shared_ptr<Code> tmp;
-
-            // NOTE: tmpにはいまからargsを入れていくので、空でないと駄目
-            // 既存のargsからとってくる時は、argsとしてあるcodeにargsはないので面倒な処理をパスしている
-            // おかしかったら下の方の[ERROR]が発動する
-            if (i_notval == config.begin()) {
-                tmp = shared_ptr<Code>(new Code);
-                tmp->l = code->l;
-                tmp->lit = code->lit;
-                // codeの引数を抜かした部分のsrcが欲しい
-                if (code->l) tmp->src = code->l->body->src;
-                else tmp->src = TknvalsRegion {code->src.beg, next(code->src.beg)};
-                
+    int hayidx = index;
+    
+    for (auto c = config.begin(); c != config.end(); ++c) {
+        if (is_notation_variable(*c)) {
+            match_variable(code, hayidx, true);
+        } else if (is_notation_free_variable(*c)) {
+            if (c == prev(config.end())) {
+                match_free_variable_greedily(code, hayidx, true);
             } else {
-                tmp = make_shared<Code>(*code->args[i]);
-                i++;
-            }
-
-            if (tmp->args.size() != 0) {
-                cout << "[ERROR] 何かがおかしい" << endl;
-            }
-
-            while (true) {
-                if (i >= code->args.size())
-                {
-                    if (res) res->insert(make_pair(*i_notval, tmp));
-                    res_count++;
-                    break;
-                }
-
-                
-                // DEBUG: As A = Bsとかは読み込める？
-                {
-                    bool escape = true;
-                    int j = 1;
-                    while (true) {
-                        if (next(i_notval,j) == config.end()) {
-                            escape = false;
-                            break;
-                        }
-//                        if (next(i_notval,j) == config.end) break;
-                        if (is_notation_free_variable(*next(i_notval,j))) break;
-                        if (!is_notation_variable(*next(i_notval,j))) {
-                            if (code->args[i+j-1]->lit.val != *next(i_notval,j)) {
-                                escape = false;
-                                break;
-                            }
-                        }
-                        j++;
-                    }
-
-                    if (escape) {
-                        if (res) res->insert(make_pair(*i_notval, tmp));
-                        res_count++;
-                        break;
-                    }
-                }
-
-
-                if (perdu && code->args[i]->lit.val == exit_token && prev(config.end()) == i_notval) {
-                    // もしかしたら同じnotationがもう一回繰り返しているかもしれない --> チェックする
-                    if (check_match_code(config, code, i, true)) {
-                        // 繰り返しているならその直前で辞める
-                        // remainがあるなら残りをremainsに格納して終了
-                        if (remains != NULL) {
-                            remain = true;
-                        }
-
-                        if (res) res->insert(make_pair(*i_notval, tmp));
-                        res_count++;
-                        i_notval--; // NOTE: remain処理のためforループ脱出防止
-                        break;
-                    }
-                    // 思い違いなら続けて
-                }
-
-                tmp->args.push_back(code->args[i]);
-                tmp->src.end = code->args[i]->src.end;
-                
-                i++;
+                match_free_variable(code, vector<string>(c, config.end()), hayidx, true);
             }
         } else {
-            if (*i_notval == exit_token) perdu = true;
-            if (i_notval == config.begin()) {
-                if (!is_notation_variable(*i_notval) && code->lit.val != *i_notval) return false;
-                
-                shared_ptr<Code> without_args = shared_ptr<Code>(new Code);
-                if (code->l) {
-                    without_args->l = shared_ptr<Lambda>(new Lambda);
-                    without_args->l->deep_copy_from(*code->l);
-                }
-                without_args->lit = code->lit;
-                
-                if (res) res->insert(make_pair(*i_notval, without_args));
-                res_count++;
-            } else {
-                if (!is_notation_variable(*i_notval) && code->args[i]->lit.val != *i_notval) return false;
-                if (res) res->insert(make_pair(*i_notval, code->args[i]));
-                res_count++;
-                i++;
-            }
+            match_token(code, *c, hayidx, true);
         }
+
+        if (hayidx == -1) return false;
     }
-
-    // 十分にマッチできていない
-    return res_count/*res.size()*/ == config.size();
-}
-
-bool apply_notation(shared_ptr<Code> &code, const Notation& notation) {
-    // first, check length
-    if (code->args.size()+1 < notation.config.size())
-        return false;
-
-
-    map<string, shared_ptr<Code>> d;
-    vector<shared_ptr<Code>> remains;
     
-    // if (!is_notation_variable(*notation.config.beg) && code->lit.val != *notation.config.beg) return false;
-    // d.insert(make_pair(*notation.config.beg, code));
-    if (!check_match_code(notation.config, code, 0, false)) return false;
-    if (!match_code(notation.config, code, &d, &remains)) return false;
-
-
-// Code fruit;
-    // fruit.deep_copy_from(notation.to);
-    code = shared_ptr<Code> (new Code);
-    code->deep_copy_from(*notation.to);
-
-
-    cout << "Matched with: ";
-    for (auto i_notval = notation.config.begin();
-         i_notval != notation.config.end();
-         i_notval++)
-        cout << *i_notval << " ";
-    cout << endl;
-
-    cout << "before" << endl;
-    cout << *code << endl << endl;
-
-    for (auto it = d.begin(); it != d.end(); it++) {
-        cout << "{" << it->first << "}" << endl;
-        cout << *it->second << endl << endl;
-    }
-
-    replace_code(code, d);
-    if (remains.size() != 0) {
-        shared_ptr<Code> tmp = code;
-        code = shared_ptr<Code> (new Code);
-        code->l = shared_ptr<Lambda> (new Lambda);
-        code->l->body = tmp;
-        code->args = remains;
-        
-        cout<< "after(remain)" << endl;
-        cout << *code << endl << endl;
-        
-        apply_notation(code, notation);
-    }
-
-    cout<< "after" << endl;
-    cout << *code << endl << endl;
-
     return true;
 }
