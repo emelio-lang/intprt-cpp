@@ -128,15 +128,13 @@ bool apply_all_notations(shared_ptr<Code> &code,
                          bool rv = false
                          )
 {
-
-    
     bool reapply = false;
     {
         auto n = notations.begin();
         while (n != notations.end()) {
             switch (n->second) {
                 case RIGHT:
-                    reapply = apply_notation_greedily(code, n->first);
+                    reapply = apply_notation(code, n->first, true);
                     break;
                 case LEFT:
                     reapply = apply_notation(code, n->first);
@@ -321,8 +319,9 @@ continue_reduction_loop:
             }
         }
 
+        ReductionFlow oldrf = rf;
         for (int i = code->args.size()-1; i >= 0; i--) {
-            S_reduction(code->args[i], rf); // TODO: ここのrfいらない？
+            S_reduction(code->args[i], oldrf); // TODO: ここのrfいらない？
             rf.argstack.push(code->args[i]);
         }
 
