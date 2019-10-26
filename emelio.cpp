@@ -56,10 +56,10 @@ int main(int argc, char **argv) {
         
         extract_all_notations(root, false);
 
-//        cout << *root << endl;
+        cout << *root << endl;
 
 //        cout << transpile(root, "c");
-//        reduction(root);
+        reduction(root);
 
         
          cout << *root << endl;
