@@ -320,6 +320,7 @@ continue_reduction_loop:
         }
 
         ReductionFlow oldrf = rf;
+        oldrf.argstack = stack<shared_ptr<Code>>();
         for (int i = code->args.size()-1; i >= 0; i--) {
             S_reduction(code->args[i], oldrf); // TODO: ここのrfいらない？
             rf.argstack.push(code->args[i]);
