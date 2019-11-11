@@ -297,18 +297,18 @@ continue_reduction_loop:
                 } else if (code->lit.val == "concat") {
                     code->l.reset(concat_p.get());
                 } else if (code->lit.val == "fuse") {
-                    // fusionの解決
-                    // fusionされている関数の引数の数は一緒であるはずなので、
-                    // どちらの関数か決定できれば解決される
-                    if (rf.argstack.size() >= code->args[0]->l->argnames.size()) {
-                        resolve_fusion(code, rf);
-                        continue;
-                    }
-                    else
-                    {
-                        *given_p = *code;
-                        return rf;
-                    }
+                    // // fusionの解決
+                    // // fusionされている関数の引数の数は一緒であるはずなので、
+                    // // どちらの関数か決定できれば解決される
+                    // if (rf.argstack.size() >= code->args[0]->l->argnames.size()) {
+                    //     resolve_fusion(code, rf);
+                    //     continue;
+                    // }
+                    // else
+                    // {
+                    //     *given_p = *code;
+                    //     return rf;
+                    // }
                 } else if (code->lit.val == "nothing") {
                     
                 } else {

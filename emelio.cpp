@@ -24,11 +24,20 @@ int main(int argc, char **argv) {
         shared_ptr<Code> root = code(pf);
         extract_all_notations(root, true);
 
-        string e = transpile(root, argv[1]);
+        rename_variables(root);
+        
+        string body = fasm(codegen(root).first);
+        string env = fasm(codegen(root).second);
+
+        ofstream ofs1("compiled/code.inc");
+        ofstream ofs2("compiled/env.inc");
+
+        ofs1 << body << endl;
+        ofs2 << env << endl;
 
         cout.rdbuf(back);
         
-        cout << e << endl;
+//        cout << e << endl;
     } else if (argc > 2) {
         std::cin >> std::noskipws;
         std::istream_iterator<char> it(std::cin);
@@ -54,15 +63,20 @@ int main(int argc, char **argv) {
         shared_ptr<Code> root = code(pf);
 //        cout << *root << endl;
         
-        extract_all_notations(root, false);
+        extract_all_notations(root, true);
+
+        cout << *root << endl;
+
+        rename_variables(root);
 
         cout << *root << endl;
 
 //        cout << transpile(root, "c");
-        reduction(root);
+//        cout << codegen(root);
+        cout << codegen(root);
 
         
-         cout << *root << endl;
+//         cout << *root << endl;
 
 
         return 0;

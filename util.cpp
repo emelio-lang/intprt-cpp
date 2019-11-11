@@ -183,6 +183,11 @@ ostream& operator<<(ostream& stream, const Code& c) {
     return stream;
 }
 
+ostream& operator<<(ostream& stream, const pair<string,string>&& p) {
+    stream << "(" << p.first << ", " << p.second << ")" << endl;
+    return stream;
+}
+
 ostream& operator<<(ostream& stream, const Lambda& l) {
     // if (l.fused.size() == 0) {
         stream << "(λ ";

@@ -83,7 +83,11 @@ unique_ptr<Code> code(ParserFlow& p);
 //pair<ProgramData,int> parse(ARG(vector<string>) tknvals, int initial_idx = 0, string basename = "");
 void reduction(shared_ptr<Code> code, bool silent = false);
 void extract_all_notations(shared_ptr<Code> c, bool silent = false);
-string transpile(shared_ptr<Code> c, const string dest);
+pair<string,string> codegen(shared_ptr<Code> c,
+               deque<string> unbinded = {},
+               vector<shared_ptr<Code>> argstack = {});
+string fasm(string);
+void rename_variables(const shared_ptr<Code> c);
 
 
 #define EMELIO_H 1

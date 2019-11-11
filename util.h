@@ -48,5 +48,7 @@ ostream& operator<<(ostream& stream, const Code&);
 ostream& operator<<(ostream& stream, const Lambda&);
 ostream& operator<<(ostream& stream, Lambda*);
 
+ostream& operator<<(ostream& stream, const pair<string,string>&&);
+
 #define UTIL_H
 #endif
