@@ -26,8 +26,8 @@ int main(int argc, char **argv) {
 
         rename_variables(root);
         
-        string body = fasm(codegen(root).first);
-        string env = fasm(codegen(root).second);
+        string body = fasm(codegen({root}).first);
+        string env = fasm(codegen({root}).second);
 
         ofstream ofs1("compiled/code.inc");
         ofstream ofs2("compiled/env.inc");
@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
 
 //        cout << transpile(root, "c");
 //        cout << codegen(root);
-        cout << codegen(root);
+        cout << codegen({root});
 
         
 //         cout << *root << endl;

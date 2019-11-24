@@ -19,6 +19,7 @@
 #include <stack>
 #include <array>
 #include <map>
+#include <set>
 
 #include "Tokenizer/util.h"
 #include "Tokenizer/tokenizer.h"
@@ -79,13 +80,24 @@ struct Lambda {
     void deep_copy_from(const Lambda& other);
 };
 
+
+struct CodegenFlow {
+    shared_ptr<Code> c;
+    deque<string> unbinded;
+    deque<shared_ptr<Code>> argstack;
+    set<string> defined;
+    unsigned fstack_offset = 0;  // for recursion
+    set<string> in_recursion;
+    map<string, shared_ptr<Code>> bind;
+};
+
+
+
 unique_ptr<Code> code(ParserFlow& p);
 //pair<ProgramData,int> parse(ARG(vector<string>) tknvals, int initial_idx = 0, string basename = "");
 void reduction(shared_ptr<Code> code, bool silent = false);
 void extract_all_notations(shared_ptr<Code> c, bool silent = false);
-pair<string,string> codegen(shared_ptr<Code> c,
-               deque<string> unbinded = {},
-               vector<shared_ptr<Code>> argstack = {});
+pair<string,string> codegen(CodegenFlow);
 string fasm(string);
 void rename_variables(const shared_ptr<Code> c);
 
