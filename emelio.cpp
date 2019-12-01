@@ -1,10 +1,14 @@
 
 #include "emelio.h"
 #include "util.h"
+#include "codegen.h"
 
 int main(int argc, char **argv) {
     Tokenizer tkn;
-    tkn.preset("cpp");
+    tkn.set("specials", "!#$%&()-^\\@[;:],./=~|`{+*}<>?");
+    tkn.set("escaper", "\"'");
+    tkn.set("ignores", "");
+    tkn.set("ignoresplit", " \t\n");
 
     if (argc == 2) {
         tkn.tokenize(argv[1]);
@@ -26,8 +30,8 @@ int main(int argc, char **argv) {
 
         rename_variables(root);
         
-        string body = fasm(codegen({root}).first);
-        string env = fasm(codegen({root}).second);
+        string body = fasm(codegen()(root).first);
+        string env = fasm(codegen()(root).second);
 
         ofstream ofs1("compiled/code.inc");
         ofstream ofs2("compiled/env.inc");
@@ -68,12 +72,13 @@ int main(int argc, char **argv) {
         cout << *root << endl;
 
         rename_variables(root);
+        set_arity()(root);
 
         cout << *root << endl;
 
 //        cout << transpile(root, "c");
 //        cout << codegen(root);
-        cout << codegen({root});
+        cout << codegen()(root);
 
         
 //         cout << *root << endl;

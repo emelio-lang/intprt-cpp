@@ -172,6 +172,8 @@ ostream& operator<<(ostream& stream, Lambda *l) {
 }
 
 ostream& operator<<(ostream& stream, const Code& c) {
+    stream << c.arity;
+    
     if (c.l) {
         stream << *c.l;
     } else if (c.lit.val != "") {

@@ -67,6 +67,8 @@ struct Code {
     // NOTE: tknvalsは変更されないことを想定しています
     TknvalsRegion src;
 
+    int arity = 0;
+
     void deep_copy_from(const Code& other);
     vector<string> plain_string();
 };
@@ -97,10 +99,6 @@ unique_ptr<Code> code(ParserFlow& p);
 //pair<ProgramData,int> parse(ARG(vector<string>) tknvals, int initial_idx = 0, string basename = "");
 void reduction(shared_ptr<Code> code, bool silent = false);
 void extract_all_notations(shared_ptr<Code> c, bool silent = false);
-pair<string,string> codegen(CodegenFlow);
-string fasm(string);
-void rename_variables(const shared_ptr<Code> c);
-
 
 #define EMELIO_H 1
 #endif

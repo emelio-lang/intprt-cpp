@@ -21,9 +21,9 @@ notation.o: notation.cpp emelio.h util.h notation.h
 	g++ -pg --std=c++2a  -c $< -g3 -o $@
 transpile.o: transpile.cpp emelio.h util.h notation.h
 	g++ -pg --std=c++2a  -c $< -g3 -o $@
-codegen.o: codegen.cpp emelio.h util.h notation.h
+codegen.o: codegen.cpp emelio.h util.h notation.h codegen.h
 	g++ -pg --std=c++2a  -c $< -g3 -o $@
-emelio.o: emelio.cpp emelio.h util.h
+emelio.o: emelio.cpp emelio.h util.h codegen.h
 	g++ -pg --std=c++2a  -c $< -g3 -o $@
 
 
