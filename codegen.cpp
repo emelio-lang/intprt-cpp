@@ -26,8 +26,22 @@ const map<string, unsigned> bf2arity = {
     { "concat", 2 },
 };
 
-inline void outprg(string &res, const string &body) { res += body + "\n"; }
-inline void outprg(string &res, string &env, const pair<string,string> &bodyenv) { res += bodyenv.first + "\n"; env += bodyenv.second + "\n"; }
+#define CODEGEN_DELIMITER " "
+
+inline void outprg(string &res, const string &body) { res += body + (CODEGEN_DELIMITER); }
+inline void outprg(string &res, string &env, const pair<string,string> &bodyenv) { res += bodyenv.first + (CODEGEN_DELIMITER); env += bodyenv.second + (CODEGEN_DELIMITER); }
+
+inline void outprg(vector<string> &res, const string &body) {
+    res.push_back(body);
+}
+inline void outroot(StackLanguage &dist, const StackLanguage &src) {
+    copy(src.root.begin(), src.root.end(), back_inserter(dist.root));
+    copy(src.env.begin(), src.env.end(), back_inserter(dist.env));
+}
+inline void outenv(StackLanguage &dist, const StackLanguage &src) {
+    copy(src.root.begin(), src.root.end(), back_inserter(dist.env));
+    copy(src.env.begin(), src.env.end(), back_inserter(dist.env));
+}
 
 string StaticProgram = "";
 unsigned function_call_counter = 0;
@@ -148,6 +162,11 @@ void set_arity::operator () (const shared_ptr<Code> c) {
         c->arity += c->l->body->arity;
 
     }
+    else if (c->lit.val == "fuse") {
+        for (auto a : c->args) (set_arity(&bind))(a);
+
+        c->arity = c->args[0]->arity + c->args.size() /*for adjust*/; // TODO?
+    }
     else {
         if (!c->l && builtin_functions.contains(c->lit.val)) {
             c->arity += bf2arity.at(c->lit.val);
@@ -170,320 +189,10 @@ void set_arity::operator () (const shared_ptr<Code> c) {
     c->arity -= c->args.size();
 }
 
-
-
-pair<string,string>
-codegen::operator () (const shared_ptr<Code> c) {
-
-    string res = "";
-    string env = "";
-
-    for (int i = c->args.size()-1; i >= 0; i--) {
-        argstack.push_back(c->args[i]);
-    }
-
-    if (c->l) {
-        // instant function call
-
-        for (auto argname : c->l->argnames) {
-            if (argstack.empty()) {
-                // unbinded.push_back(argname);
-                return make_pair("", "");
-            } else {
-                cout << argname << ":" << *argstack.back() << endl << endl;
-                bind[argname] = argstack.back();
-                argstack.pop_back();
-            }
-            // defined.insert(argname);
-        }
-
-        outprg(res, env, this->operator()(c->l->body));
-        
-        return make_pair(res, env);
-    }
-    else if (c->lit.val == "fuse") {
-    }
-    else if (builtin_functions.contains(c->lit.val)) {
-        // builtin-function call
-
-        if (bf2arity.at(c->lit.val) != argstack.size()) return make_pair("", "");
-
-        cout << "buitin-function call" << endl;
-        cout << *c <<endl;
-        cout << "current stack: ";
-        SCOUT(argstack);
-        
-        auto _argstack = argstack;
-        for (auto arg : _argstack) {
-            argstack = {};
-            outprg(res, env, this->operator()(arg));
-            // copy(argstack.begin(), argstack.end(), back_inserter(_argstack));
-        }
-        argstack.clear();
-        
-        outprg(res, c->lit.val);
-    }
-    else if (is_literal(c->lit.val)) {
-        // literal
-
-        cout << "literal" << endl;
-        cout << *c <<endl;
-        
-        // for (auto arg : argstack) {
-        //     auto _argstack = argstack;
-        //     argstack = {};
-        //     outprg(res, env, codegen({arg, unbinded, {}, defined, fstack_offset, in_recursion, bind}));
-        //     copy(argstack.begin(), argstack.end(), back_inserter(_argstack));
-        //     argstack = _argstack;
-        // }
-        // argstack.clear();
-
-        auto _argstack = argstack;
-        for (auto arg : _argstack) {
-            argstack = {};
-            outprg(res, env, this->operator()(arg));
-            // copy(argstack.begin(), argstack.end(), back_inserter(_argstack));
-        }
-        argstack.clear();
-
-
-        outprg(res, "push "+c->lit.val);
-    }
-    else {
-        // general function call
-
-        // NOTE: spill counter cuz it's grobval
-        const unsigned fnidx = function_call_counter++;
-        const unsigned argnum = argstack.size();
-        const bool is_recursive = !bind.contains(c->lit.val);
-
-        cout << "general function call: " << c->lit.val << endl;
-        cout << "current stack: ";
-        SCOUT(argstack);
-        
-        if (bind[c->lit.val]->arity - argnum > 0) {
-            cout << "few !!" << endl;
-            // copy(argstack.begin(), argstack.end(), back_inserter(bind[c->lit.val]->args));
-            // outprg(res, env, this->operator()(c->l->body));
-            return make_pair("","");
-        }
-
-        
-        outprg(res, ";; " + c->lit.val);
-
-        //body call
-        outprg(res, env, this->operator()(bind[c->lit.val]));
-        
-        argstack.clear();
-        return make_pair(res, env);
-    }
-
-
-    return make_pair(res, env);
-}
-
-
-
-
-deque<shared_ptr<Code>> argstack;
-pair<string,string> codegen(CodegenFlow cf) {
-    shared_ptr<Code> &c = cf.c;
-    deque<string> &unbinded = cf.unbinded;
-    set<string> &defined = cf.defined;
-    deque<shared_ptr<Code>> &argstack_ = cf.argstack;
-    unsigned &fstack_offset = cf.fstack_offset;
-    set<string> &in_recursion = cf.in_recursion;
-    map<string, shared_ptr<Code>> &bind = cf.bind;
-
-    string res = "";
-    string env = "";
-
-    for (int i = c->args.size()-1; i >= 0; i--) {
-        argstack.push_back(c->args[i]);
-    }
-
-    if (c->l) {
-        // instant function call
-
-        for (auto argname : c->l->argnames) {
-            if (argstack.empty()) {
-                // TODO
-                unbinded.push_back(argname);
-                return make_pair("", "");
-            } else {
-                cout << argname << ":" << *argstack.back() << endl << endl;
-                bind[argname] = argstack.back();
-                
-                // outprg(env, "_" + argname + ": ");
-                // outprg(env, env, codegen({argstack.back(), unbinded, {}, defined, fstack_offset, in_recursion, bind}));
-                // outprg(env, "ret");
-                argstack.pop_back();
-            }
-            defined.insert(argname);
-        }
-
-        outprg(res, env, codegen({c->l->body, unbinded, argstack_, defined, fstack_offset, in_recursion, bind}));
-
-        
-        // cout << *c << endl;
-        // cout << make_pair(res, env) << endl << endl;
-
-        
-        return make_pair(res, env);
-    }
-
-
-    if (c->lit.val == "fuse") {
-        // fuse
-
-        // NOTE: only see direct arguments
-        Guard guard = get_guard(c->args);
-        GuardType gtype = get_guard_type(c->args);
-
-
-        switch (gtype) {
-            case GTYPE_COUNTABLE_FINITE: {
-                // fuseのargumentは関係ないので消しておく
-                // TODO: これだと、最初のstackに詰める処理が無駄...
-                for (int i = 0; i < c->args.size(); i++)
-                    argstack.pop_back();
-
-                for (auto a : argstack) {
-                    outprg(res, ":)");
-                    stringstream ss;
-                    ss << *a;
-                    outprg(res, ss.str());
-                    
-                }
-
-                // TODO: ここでもしargstackが空であれば、スタックから読み込むべき
-
-                // run first arg to patternmatch
-                // TODO: 関数の時は？
-                outprg(res, env, codegen({argstack.back(), unbinded, {}, defined /* TODO ? */, fstack_offset, in_recursion, bind}));
-
-                // pattern match
-                outprg(res, "mov edx,1");
-//                outprg(res, "call __get");
-                outprg(res, "get");
-
-                unsigned endif_index = conditional_counter + guard.finites.size();
-
-                cout << "Guard: " << endl;
-                
-                for (pair<string, shared_ptr<Code>> fnt : guard.finites) {
-                    outprg(res, "cmp $a0," + fnt.first);// HACKed
-                    outprg(res, "jne else" + to_string(conditional_counter));
-                    // outprg(res, "true"+to_string(conditional_counter)+":");
-
-//                    outprg(res, "call __pop");
-                    outprg(res, "pop");
-                    outprg(res, env, codegen({fnt.second, unbinded, {}, defined, fstack_offset, in_recursion, bind}));
-                    cout << "finite " << *fnt.second << endl;
-                    
-                    // outprg(res, "jmp endif"+ to_string(conditional_counter));
-                    // outprg(res, "false"+to_string(conditional_counter)+":");
-                    outprg(res, "jmp endif"+to_string(endif_index));
-                    outprg(res, "else"+to_string(conditional_counter)+":");
-
-                    conditional_counter++;
-                }
-
-//                outprg(res, "call __pop");
-                outprg(res, "pop");
-                // NOTE: これより内部の引数はcodegen内で実行されるので皮だけでok
-                for (auto argname : guard.countable->l->argnames)
-                    defined.insert(argname);
-                outprg(res, env, codegen({guard.countable, unbinded, argstack_, defined, fstack_offset, in_recursion, bind}));
-                cout << "countable " << *guard.countable << endl;
-                
-                outprg(res, "endif"+to_string(endif_index)+":");
-            } break;
-                
-            case GTYPE_FINITE: {
-            } break;
-        }
-
-        argstack.clear();
-        
-    }
-    else if (builtin_functions.contains(c->lit.val)) {
-        // builtin-function call
-
-        if (bf2arity.at(c->lit.val) != argstack.size()) return make_pair("", "");
-
-        cout << "buitin-function call" << endl;
-        cout << *c <<endl;
-        
-        for (auto arg : argstack) {
-            auto _argstack = argstack;
-            argstack = {};
-            outprg(res, env, codegen({arg, unbinded, {}, defined, fstack_offset, in_recursion, bind}));
-            copy(argstack.begin(), argstack.end(), back_inserter(_argstack));
-            argstack = _argstack;
-        }
-        argstack.clear();
-        
-        outprg(res, c->lit.val);
-    }
-    else if (is_literal(c->lit.val)) {
-        // literal
-
-        cout << "literal" << endl;
-        cout << *c <<endl;
-        
-        for (auto arg : argstack) {
-            auto _argstack = argstack;
-            argstack = {};
-            outprg(res, env, codegen({arg, unbinded, {}, defined, fstack_offset, in_recursion, bind}));
-            copy(argstack.begin(), argstack.end(), back_inserter(_argstack));
-            argstack = _argstack;
-        }
-        argstack.clear();
-
-        outprg(res, "push "+c->lit.val);
-    }
-    else {
-        // general function call
-
-        // NOTE: spill counter cuz it's grobval
-        const unsigned fnidx = function_call_counter++;
-        const unsigned argnum = argstack.size();
-        const bool is_recursive = !defined.contains(c->lit.val);
-
-        // shallow copy 
-        // Code argumented = *bind[c->lit.val];
-        // copy(argstack.begin(), argstack.end(), back_inserter(argumented.args));
-        // argumented.arity -= argstack.size();
-        // argstack.clear();
-        
-        if (bind[c->lit.val]->arity - argnum > 0) {
-            copy(argstack.begin(), argstack.end(), back_inserter(bind[c->lit.val]->args));
-            
-            cout << "few !!" << endl;
-            return make_pair("","");
-        }
-
-        cout << "general function call" << endl;
-        cout << *c <<endl;
-
-        
-        outprg(res, ";; " + c->lit.val);
-
-        //body call
-        outprg(res, env, codegen({// make_shared<Code>(argumented)
-                    bind[c->lit.val]
-                                  , unbinded, argstack, defined, fstack_offset, in_recursion, bind}));
-        
-        argstack.clear();
-    }
-
-    // cout << *c << endl;
-    // cout << make_pair(res, env) << endl << endl;
-
-    return make_pair(res, env);
-}
-
+#include "codegen1.cpp"
+#include "codegen2.cpp"
+#include "codegen3.cpp"
+#include "ocamlgen.cpp"
 
 vector<string> split_instr(string instr) {
     vector<string> res;
@@ -505,6 +214,60 @@ string join_instr(vector<string> instrs) {
         res += instrs[i] + ",";
     }
     res.pop_back();
+    return res;
+}
+
+string fasm_ins(string ins) {
+    if (is_literal(ins)) {
+        return
+            "_push " + ins;
+    }
+    else if (ins.starts_with(":")) {
+        // label
+        return
+            ins.substr(1) + ":";
+    }
+    else if (ins.starts_with("dup")) {
+        return
+            "_dup " + ins.substr(3);
+    }
+    else if (ins.starts_with("drop")) {
+        return
+            "_pop";
+    }
+    else if (ins.starts_with("!dup")) {
+        return
+            "_exec " + ins.substr(4);
+    }
+    else if (ins.starts_with("decbsp")) {
+        return
+            "_decbsp " + ins.substr(6);
+    }
+    else if (ins.starts_with("rewind")) {
+        return
+            "_rewind " + ins.substr(6);
+    }
+    else if (ins.starts_with("'")) {
+        return
+            "_push " + ins.substr(1);
+    }
+    else if (ins == ";") return "ret";
+    else if (ins == "+") return "call __add";
+    else if (ins == "-") return "call __sub";
+    else if (ins == "*") return "call __mul";
+    else if (ins == "/") return "call __div";
+    else if (ins == "negate") return "call __negate";
+    else {
+        return
+            "call " + ins;
+    }
+}
+
+string fasm(const vector<string> &s) {
+    string res;
+
+    for (string ins : s) res += fasm_ins(ins) + "\n";
+
     return res;
 }
 

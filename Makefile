@@ -21,7 +21,7 @@ notation.o: notation.cpp emelio.h util.h notation.h
 	g++ -pg --std=c++2a  -c $< -g3 -o $@
 transpile.o: transpile.cpp emelio.h util.h notation.h
 	g++ -pg --std=c++2a  -c $< -g3 -o $@
-codegen.o: codegen.cpp emelio.h util.h notation.h codegen.h
+codegen.o: codegen.cpp emelio.h util.h notation.h codegen.h codegen*.cpp ocamlgen.cpp
 	g++ -pg --std=c++2a  -c $< -g3 -o $@
 emelio.o: emelio.cpp emelio.h util.h codegen.h
 	g++ -pg --std=c++2a  -c $< -g3 -o $@
@@ -41,7 +41,8 @@ comptest: emelio
 compr: 
 	./compiled/a.out
 
-clean: 
+clean:
+	rm *.o
 	rm *.cpp.cc
 
 build: $(OBJS) emelio.h

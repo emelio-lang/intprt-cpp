@@ -20,6 +20,7 @@
 #include <array>
 #include <map>
 #include <set>
+#include <cassert>
 
 #include "Tokenizer/util.h"
 #include "Tokenizer/tokenizer.h"

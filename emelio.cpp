@@ -29,16 +29,16 @@ int main(int argc, char **argv) {
         extract_all_notations(root, true);
 
         rename_variables(root);
-        
-        string body = fasm(codegen()(root).first);
-        string env = fasm(codegen()(root).second);
+        auto tmp = codegen2()(root);
+        auto body = fasm(tmp.root);
+        auto env = fasm(tmp.env);
 
         ofstream ofs1("compiled/code.inc");
         ofstream ofs2("compiled/env.inc");
 
         ofs1 << body << endl;
         ofs2 << env << endl;
-
+        
         cout.rdbuf(back);
         
 //        cout << e << endl;
@@ -78,7 +78,19 @@ int main(int argc, char **argv) {
 
 //        cout << transpile(root, "c");
 //        cout << codegen(root);
-        cout << codegen()(root);
+        cout << "prepare name hash:\n";
+        string body, env;
+        tie(body, env) = codegen3()(root);
+
+
+        ofstream ofs1("compiled/code.c");
+        ofstream ofs2("compiled/env.c");
+        ofs1 << body << endl;
+        ofs2 << env << endl;
+
+        cout << endl << endl;
+        cout << body << endl << endl;
+        cout << env << endl << endl;
 
         
 //         cout << *root << endl;
