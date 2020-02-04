@@ -2,8 +2,6 @@ emelio
 memo.md
 .vscode/
 .DS_Store
-compiled/
-!compiled/code.c
 
 # Prerequisites
 *.d
