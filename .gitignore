@@ -2,6 +2,9 @@ emelio
 memo.md
 .vscode/
 .DS_Store
+compiled/env.c
+compiled/code.c
+compiled/lib.s
 
 # Prerequisites
 *.d
@@ -37,3 +40,6 @@ memo.md
 *.app
 
 *.cpp.cc
+
+*.new
+*.inc
