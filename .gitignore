@@ -43,3 +43,10 @@ compiled/lib.s
 
 *.new
 *.inc
+
+# IDE
+*.cflags
+*.config
+*.files
+*.cxxflags
+*.includes
