@@ -50,3 +50,5 @@ compiled/lib.s
 *.files
 *.cxxflags
 *.includes
+*.creator
+*.creator.user
