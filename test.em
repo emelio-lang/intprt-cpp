@@ -1,1 +1,1 @@
-(|f| (f 3) 2) (|a b| add a b)
+(|g| (|foo| foo (foo 1 3) 5) (|a b| add a g)) 7

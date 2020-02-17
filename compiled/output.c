@@ -33,46 +33,50 @@ union memory_t *SP, *AP, ACC;
 void(*HP[256])();
 union memory_t *MEM;
 
-void NEG() {
+void negate() {
     int a = TOP()->val; MPOP();
     PUSHV(-a);
     return;
 }
-void SUB() {
+void sub() {
     int b = TOP()->val; MPOP();
     int a = TOP()->val; MPOP();
     PUSHV(a - b);
     return;
 }
-void ADD() {
+void add() {
+//    (SP+(-1))->fp();
+//    (SP+(-3))->fp();
+    
     int b = TOP()->val; MPOP();
     int a = TOP()->val; MPOP();
+
+//    MPOP();MPOP(); // 関数の方も削除
     
     PUSHV(a + b);
     return;
 }
-void MUL() {
-    printf("a\n");
-
+void mul() {
     int b = TOP()->val; MPOP();
     int a = TOP()->val; MPOP();
-    
+
     PUSHV(a * b);
     return;
 }
 
 
-#include "env.c.new"
+#include "env.c"
+// #include "env.c.new"
 
 
 int main() {
 stack_init:
     MEM = calloc(256, sizeof(union memory_t));
     AP = SP = MEM;
-    HP[0] = ADD;
-    HP[1] = SUB;
-    HP[2] = MUL;
-    HP[3] = NEG;
+    // HP[0] = ADD;
+    // HP[1] = SUB;
+    // HP[2] = MUL;
+    // HP[3] = NEG;
 
 start:
 #include "code.c"

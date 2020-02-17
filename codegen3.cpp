@@ -193,18 +193,26 @@ codegen3::operator () (const shared_ptr<Code> c) {
 //        argstack.clear();
     }
     else if (is_literal(c->lit.val)) {
+//        const unsigned fnidx = function_call_counter++;
+
+//        res.second += "void LIT"+to_string(fnidx)+"() {\n";
+//        res.second += "PUSHV("+c->lit.val+");\n";
+//        res.second += "return;\n";
+//        res.second += "}\n";
+
         assert(c->args.size() == 0);
         this->stack_height++;
         if (human) {
             res.first += "Push: "+c->lit.val+"\n";
         } else {
             res.first += "PUSHV("+c->lit.val+");\n";
+//            res.first += "PUSHF(LIT"+to_string(fnidx)+");\n";
         }
     }
     else if (builtin_functions.contains(c->lit.val)) {
         const unsigned fnidx = function_call_counter++;
 
-//        res.first += "PUSHV(0); POP();\n";
+        // res.first += "PUSHV(0); POP();\n";
         auto tmp_bind = this->bind;
         for (int i = 0; i < c->args.size(); i++) {
             // 引数もR1実行
@@ -219,13 +227,21 @@ codegen3::operator () (const shared_ptr<Code> c) {
             { "negate", "3" },
             { "div", "4" },
         };
-        res.first += "HP["+c_builtin.at(c->lit.val)+"]();\n";
-        this->stack_height -= bf2arity.at(c->lit.val)-1;
+//        res.first += "HP["+c_builtin.at(c->lit.val)+"]();\n";
+        res.first += c->lit.val+"();\n";
+        int ar = bf2arity.at(c->lit.val);
+        this->stack_height -= ar-1;
+
+//        res.first += "*STACK("+to_string(ar+2)+") = *TOP();\n";
+//        for (int i = ar-1 + (ar != 0 ? 1 : 0)/*いらない方の戻り値分*/; i >= 0; i--) {
+//            res.first += "MPOP();\n";
+//            this->stack_height--;
+//        }
     }
     else {
         const unsigned fnidx = function_call_counter++;
 
-        if (c->args.size() != 0) {
+        if (c->args.size() != 0 /* && c->arity == 0*/) {
             res.first += "PUSHV(0); POP();\n";
             this->stack_height++;
         }
@@ -235,9 +251,6 @@ codegen3::operator () (const shared_ptr<Code> c) {
         for (int i = c->args.size()-1; i >= 0; i--) {
             // 引数はまとめながらラムダ抽象
             // 今はまとめはしない
-            cout << "PUSHF(F"+to_string(fnidx)+"A"+to_string(i)+");\n";
-            cout << tmp_stackh<<"\n";
-            
             res.first += "PUSHF(F"+to_string(fnidx)+"A"+to_string(i)+");\n";
             tmp_stackh++;
             this->stack_height = 0;
@@ -275,6 +288,11 @@ codegen3::operator () (const shared_ptr<Code> c) {
             this->bind = tmp_bind;
         }
         else {
+            // 文字参照
+
+            // if (builtin_functions.contains(c->lit.val)) {
+            //     res.first += c->lit.val+"();\n";
+            // } else
             if (bind[c->lit.val] < 0) {
                 res.first += "(SP+("+to_string(bind[c->lit.val]-stack_height)+"))->fp();\n";
             } else {
@@ -295,114 +313,3 @@ codegen3::operator () (const shared_ptr<Code> c) {
 
     return res;
 }
-
-
-// pair<string,string>
-// codegen3::operator () (const shared_ptr<Code> c) {
-//     pair<string,string> res;
-
-//     // else
-//     if (c->lit.val == "fuse") {
-//         // fuse
-
-//         // NOTE: only see direct arguments
-//         Guard guard = get_guard(c->args);
-//         GuardType gtype = get_guard_type(c->args);
-
-//         switch (gtype) {
-//             case GTYPE_COUNTABLE_FINITE: {
-//             } break;
-
-//             case GTYPE_FINITE: {
-//             } break;
-//         }
-
-//         argstack.clear();
-//     }
-//     else if (is_literal(c->lit.val)) {
-//         assert(c->args.size() == 0);
-//         this->stack_height++;
-//         if (human) {
-//             res.first += "Push: "+c->lit.val+"\n";
-//         } else {
-//             res.first += "PUSHV("+c->lit.val+");\n";
-//         }
-//     }
-//     else if (builtin_functions.contains(c->lit.val)) {
-//         const unsigned fnidx = function_call_counter++;
-
-// //        res.first += "PUSHV(0); POP();\n";
-//         auto tmp_bind = this->bind;
-//         for (int i = 0; i < c->args.size(); i++) {
-//             // 引数もR1実行
-//             paircat(res, this->operator()(c->args[i]));
-//             this->bind = tmp_bind;
-//         }
-
-//         const map<string,string> c_builtin = {
-//             { "add", "0" },
-//             { "sub", "1" },
-//             { "mul", "2" },
-//             { "negate", "3" },
-//             { "div", "4" },
-//         };
-//         res.first += "HP["+c_builtin.at(c->lit.val)+"]();\n";
-//         this->stack_height -= bf2arity.at(c->lit.val)-1;
-//     }
-//     else {
-//         const unsigned fnidx = function_call_counter++;
-
-//         if (c->args.size() != 0) {
-//             res.first += "PUSHV(0); POP();\n";
-//             this->stack_height++;
-//         }
-//         auto tmp_bind = this->bind;
-//         auto tmp_stack = stack_height;
-//         for (int i = c->args.size()-1; i >= 0; i--) {
-//             // 引数はまとめながらラムダ抽象
-//             // 今はまとめはしない
-//             res.first += "PUSHF(F"+to_string(fnidx)+"A"+to_string(i)+");\n";
-//             tmp_stack++;
-//             res.second += "void F"+to_string(fnidx)+"A"+to_string(i)+"() {\n";
-//             this->stack_height = tmp_stack;
-//             argstack.push_back(this->stack_height);
-//             res.second += compress(this->operator()(c->args[i]));
-//             res.second += "return;\n";
-//             res.second += "}\n";
-//         }
-//         this->bind = tmp_bind;
-//         this->stack_height = tmp_stack;
-
-//         if (c->l) {
-//             int i = 0;
-//             for (auto a : c->l->argnames) {
-//                 bind[a] = this->stack_height-i;
-//                 res.first += "HP['"+a+"'] = TOP()->fp; POP();\n";
-//                 i++;
-//             }
-//             auto tmp_bind = this->bind;
-//             paircat(res, this->operator()(c->l->body));
-//             this->bind = tmp_bind;
-//         }
-//         else {
-// //            res.first += "HP['"+c->lit.val+"']();\n";
-//             cout << c->lit.val << endl;
-//             cout << bind[c->lit.val] << endl;
-//             cout << this->stack_height << endl;
-//             res.first += "(MEM+"+to_string(bind[c->lit.val]-1)+")->fp();\n";
-//             this->stack_height++;
-//         }
-
-//         // 戻り地コピー
-//         // TODO: pointerより大きい時は、ヒープに実体を置いてとかしないと駄目かもね...
-//         if (c->args.size() != 0)
-//             res.first += "*STACK("+to_string(c->args.size()+2)+") = *TOP();\n";
-//         for (int i = c->args.size()-1 + (c->args.size() != 0 ? 1 : 0)/*いらない方の戻り値分*/; i >= 0; i--) {
-//             res.first += "MPOP();\n";
-//             this->argstack.pop_back();
-//             this->stack_height--;
-//         }
-//     }
-
-//     return res;
-// }
