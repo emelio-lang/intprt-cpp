@@ -19,6 +19,8 @@
 #include <array>
 #include <map>
 
+void ASSERT(bool glass, std::string msg);
+
 vector<string> split(const string &s, char delim);
     
 template<typename Char, typename Traits, typename Allocator>
@@ -30,6 +32,7 @@ std::basic_string<Char, Traits, Allocator> operator *
 (size_t n, const std::basic_string<Char, Traits, Allocator>& s);
 
 bool is_number(const std::string& s);
+bool is_string_literal(const std::string& s);
 bool is_literal(const std::string& s);
 bool is_builtin(const std::string& s);
 

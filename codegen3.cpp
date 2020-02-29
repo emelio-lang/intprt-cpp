@@ -226,7 +226,11 @@ codegen3::operator () (const shared_ptr<Code> c) {
         if (human) {
             res.first += "Push: "+c->lit.val+"\n";
         } else {
-            res.first += "PUSHV("+c->lit.val+");\n";
+            if (is_number(c->lit.val)) {
+                res.first += "PUSHV("+c->lit.val+");\n";
+            } else {
+                res.first += "PUSHS("+c->lit.val+");\n";
+            }
 //            res.first += "PUSHF(LIT"+to_string(fnidx)+");\n";
         }
     }

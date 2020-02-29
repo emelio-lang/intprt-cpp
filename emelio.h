@@ -77,6 +77,7 @@ struct Code {
 struct Lambda {
     vector<string> argnames {};
     shared_ptr<Code> body;
+    vector<int> argarities {};
 
 //    vector<shared_ptr<Lambda>> fused;
 

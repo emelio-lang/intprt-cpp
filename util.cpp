@@ -100,6 +100,13 @@ bool is_computed(const shared_ptr<Code> &c) {
 
 //Code::~Code() { if (l) delete l; }
 
+void ASSERT(bool glass, std::string msg) {
+    if (!glass) {
+        cout << "Error: " + msg << endl;
+        assert(glass);
+    }
+}
+
 
 bool is_number(const std::string& s)
 {
@@ -112,8 +119,12 @@ bool is_number(const std::string& s)
     return true;
 }
 
+bool is_string_literal(const std::string& s) {
+    return s.front() == '"' && s.back() == '"';
+}
+
 bool is_literal(const std::string& s) {
-    return is_number(s);
+    return is_number(s) || is_string_literal(s);
 }
 
 bool is_builtin(const std::string& s) {

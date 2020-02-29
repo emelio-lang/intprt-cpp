@@ -10,6 +10,7 @@
 #include "util.h"
 
 #define NOW p.tknvals[p.idx]
+#define NEXT p.tknvals[p.idx+1]
 #define PASER(type, name)
 
 // {!MONAD <> e <> t <> u <> {const pair<#t, ParserFlow&> tmp1 = #u(p); #e = tmp1.first;    /*p = tmp1.second;*/}!}
@@ -27,7 +28,7 @@
 {- PARSE <> Literal <> literal -}
 {
     Literal l;
-    l.val = p.tknvals[p.idx];
+    l.val = NOW;
     p.idx++;
     
     return l;
@@ -48,7 +49,17 @@
                 {- SKIP <> "|" -}
                 break;
             } else {
-                l->argnames.push_back(NOW);
+                l->argnames.emplace_back(NOW);
+
+                // 種システム：酒の指定があればパース
+                if (NEXT == "(") {
+                    {- SKIP <> NOW -}
+                    {- SKIP <> "(" -}
+                    l->argarities.emplace_back(stoi(NOW));
+                    {- SKIP <> NOW -}
+                } else {
+                    l->argarities.emplace_back(-1);
+                }
             }
         }
     }
@@ -101,7 +112,7 @@
             break;
         }
 
-        {- MONAD_F <> c->args.push_back <> shared_ptr<Code> <> argument -}
+        {- MONAD_F <> c->args.emplace_back <> shared_ptr<Code> <> argument -}
     }
 
 

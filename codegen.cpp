@@ -152,10 +152,22 @@ void set_arity::operator () (const shared_ptr<Code> c) {
         int i = 0;
         for (auto argname : c->l->argnames) {
 //            cout << argname << endl;
-            if (argstack.empty()) break;
+            if (argstack.empty()) {
+                // 引数情報から推論できない場合でも、種の指定があればそれとする。
+                // 指定もなければbindに入れないことでマークしておく（下の方の処理でないと推論の情報があった時つじつまを合わせる）
+                if (c->l->argarities[i] != -1)
+                    bind[argname] = c->l->argarities[i];
+                continue;
+            }
 //            cout << *argstack.top() << endl;
             bind[argname] = argstack.top()->arity;
+            // 種の指定があれば、整合性をチェック
+            if (c->l->argarities[i] != -1)
+                ASSERT(bind[argname] == c->l->argarities[i],
+                       ("引数"+argname+"の種が合致しません. (expected:" + to_string(c->l->argarities[i]) +
+                        " inferred:"+to_string(bind[argname])+")"));
             argstack.pop();
+            i++;
         }
 
         this->operator()(c->l->body);
