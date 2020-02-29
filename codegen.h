@@ -79,6 +79,8 @@ public:
     codegen3() {}
     codegen3(bool h) : human(h) {}
     ~codegen3() {}
+    string evoke_rel(int rel);
+    string print_rel(int rel);
     pair<string,string> operator () (const shared_ptr<Code> c);
     pair<string,string> fnrun1(const shared_ptr<Code> c);
     pair<string,string> fnrun2(const shared_ptr<Code> c);

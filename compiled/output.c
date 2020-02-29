@@ -39,8 +39,8 @@ void negate() {
     return;
 }
 void sub() {
-    int b = TOP()->val; MPOP();
     int a = TOP()->val; MPOP();
+    int b = TOP()->val; MPOP();
     PUSHV(a - b);
     return;
 }
@@ -48,8 +48,8 @@ void add() {
 //    (SP+(-1))->fp();
 //    (SP+(-3))->fp();
     
-    int b = TOP()->val; MPOP();
     int a = TOP()->val; MPOP();
+    int b = TOP()->val; MPOP();
 
 //    MPOP();MPOP(); // 関数の方も削除
     
@@ -57,8 +57,8 @@ void add() {
     return;
 }
 void mul() {
-    int b = TOP()->val; MPOP();
     int a = TOP()->val; MPOP();
+    int b = TOP()->val; MPOP();
 
     PUSHV(a * b);
     return;

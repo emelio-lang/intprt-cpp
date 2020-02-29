@@ -14,7 +14,7 @@
 #include <sstream>
 
 const set<string> builtin_functions = {
-    "add", "sub", "mul", "div", "negate", "concat"
+    "add", "sub", "mul", "div", "negate", "concat", "fuse"
 };
 
 const map<string, unsigned> bf2arity = {
