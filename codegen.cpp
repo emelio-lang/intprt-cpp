@@ -47,13 +47,6 @@ string StaticProgram = "";
 unsigned function_call_counter = 0;
 unsigned conditional_counter = 0;
 
-enum GuardType { GTYPE_COUNTABLE_FINITE, GTYPE_FINITE };
-struct Guard {
-    vector<pair<string, shared_ptr<Code>>> finites;
-    shared_ptr<Code> countable;
-};
-
-
 Guard get_guard(const vector<shared_ptr<Code>> &args) {
     Guard res;
     for (auto arg : args) {

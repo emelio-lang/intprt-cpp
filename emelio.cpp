@@ -79,18 +79,18 @@ int main(int argc, char **argv) {
 //        cout << transpile(root, "c");
 //        cout << codegen(root);
         cout << "prepare name hash:\n";
-        string body, env;
-        tie(body, env) = codegen3()(root);
+        Compiled result;
+        result = codegen3()(root);
 
 
         ofstream ofs1("compiled/code.c");
         ofstream ofs2("compiled/env.c");
-        ofs1 << body << endl;
-        ofs2 << env << endl;
+        ofs1 << result.body << endl;
+        ofs2 << result.env << endl;
 
         cout << endl << endl;
-        cout << body << endl << endl;
-        cout << env << endl << endl;
+        cout << result.body << endl << endl;
+        cout << result.env << endl << endl;
 
         
 //         cout << *root << endl;

@@ -1,3 +1,3 @@
-(|fadd|
-fadd 5
-) (fuse (|n| add n (fadd (sub n 1))) (|0| 0))
+(|foo|
+    foo 7
+) (fuse (|0| 0) (|x| add x 1))

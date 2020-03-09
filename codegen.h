@@ -9,6 +9,14 @@
 
 #include "emelio.h"
 
+enum GuardType { GTYPE_COUNTABLE_FINITE, GTYPE_FINITE };
+struct Guard {
+    vector<pair<string, shared_ptr<Code>>> finites;
+    shared_ptr<Code> countable;
+};
+Guard get_guard(const vector<shared_ptr<Code>> &args);
+GuardType get_guard_type(const vector<shared_ptr<Code>> &args);
+
 
 class set_arity {
 private:
@@ -65,11 +73,20 @@ public:
     StackLanguage operator () (const shared_ptr<Code> c);
 };
 
+struct BindInfo {
+    double zeroarity = false;
+};
+
+struct Compiled {
+    string body="", env="";
+};
+
 class codegen3 {
 private:
 
     deque<int> argstack;
     map<string, int> bind;
+    map<string, BindInfo> bindinfo;
     set<string> in_recursion;
     int stack_height = 0;
     bool is_root = true;
@@ -79,15 +96,17 @@ public:
     codegen3() {}
     codegen3(bool h) : human(h) {}
     ~codegen3() {}
-    string evoke_rel(int rel);
     string print_rel(int rel);
-    pair<string,string> operator () (const shared_ptr<Code> c);
-    pair<string,string> fnrun1(const shared_ptr<Code> c);
-    pair<string,string> fnrun2(const shared_ptr<Code> c);
-    pair<string,string> function_call(const shared_ptr<Code> c);
-    pair<string,string> human_function_call(const shared_ptr<Code> c);
-    string compress(const pair<string,string> &&v);
-    void paircat(pair<string,string> &x, const pair<string,string> &&v);
+    Compiled evoke_rel(int rel);
+    Compiled literal(const string lit);
+    Compiled fuse(const vector<shared_ptr<Code>> fns);
+    Compiled builtin(const string &name);
+    Compiled argument_evoked(const vector<shared_ptr<Code>> &args);
+    Compiled operator () (const shared_ptr<Code> c);
+    // v.main <+ v.env
+    string compress(const Compiled &&v);
+    // a += b
+    void paircat(Compiled &a, const Compiled &&b);
 };
 
 class ocamlgen {

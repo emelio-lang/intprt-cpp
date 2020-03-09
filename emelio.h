@@ -21,6 +21,7 @@
 #include <map>
 #include <set>
 #include <cassert>
+#include <variant>
 
 #include "Tokenizer/util.h"
 #include "Tokenizer/tokenizer.h"
@@ -74,10 +75,16 @@ struct Code {
     vector<string> plain_string();
 };
 
+struct ArgQuality {
+    bool recursive = false;
+};
+
+
 struct Lambda {
     vector<string> argnames {};
     shared_ptr<Code> body;
     vector<int> argarities {};
+    vector<ArgQuality> argqualities {};
 
 //    vector<shared_ptr<Lambda>> fused;
 
@@ -94,6 +101,14 @@ struct CodegenFlow {
     set<string> in_recursion;
     map<string, shared_ptr<Code>> bind;
 };
+
+struct TypeSignature {
+    vector<variant<string, shared_ptr<TypeSignature>>> from;
+    vector<variant<string, shared_ptr<TypeSignature>>> to;
+
+    int arity() { return from.size(); }
+};
+
 
 
 

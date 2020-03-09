@@ -13,6 +13,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #define uint unsigned int
 #define PUSHF(x) AP->fp = x; AP++; SP = AP;

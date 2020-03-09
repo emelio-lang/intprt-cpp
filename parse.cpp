@@ -50,6 +50,13 @@
                 break;
             } else {
                 l->argnames.emplace_back(NOW);
+                l->argqualities.emplace_back(ArgQuality {});
+
+                if (NEXT == "*") {
+                    // 再帰
+                    {- SKIP <> NOW -}
+                    l->argqualities.back().recursive = true;
+                }
 
                 // 種システム：酒の指定があればパース
                 if (NEXT == "(") {
