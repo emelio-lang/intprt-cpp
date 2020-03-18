@@ -74,7 +74,7 @@ public:
 };
 
 struct BindInfo {
-    double zeroarity = false;
+    shared_ptr<Code> code;
 };
 
 struct Compiled {
@@ -84,7 +84,10 @@ struct Compiled {
 class codegen3 {
 private:
 
+    // バインド保留のコード と それの実体（または実体を指すポインタ）があるスタックの絶対位置 のペア
     deque<int> argstack;
+    deque<shared_ptr<Code>> argstack_code;
+
     map<string, int> bind;
     map<string, BindInfo> bindinfo;
     set<string> in_recursion;
@@ -98,10 +101,12 @@ public:
     ~codegen3() {}
     string print_rel(int rel);
     Compiled evoke_rel(int rel);
+    Compiled copy_rel(int rel);
     Compiled literal(const string lit);
     Compiled fuse(const vector<shared_ptr<Code>> fns);
     Compiled builtin(const string &name);
-    Compiled argument_evoked(const vector<shared_ptr<Code>> &args);
+    Compiled all_arguments_evoked(const vector<shared_ptr<Code>> &args);
+    Compiled argument_evoked(const shared_ptr<Code> &args);
     Compiled operator () (const shared_ptr<Code> c);
     // v.main <+ v.env
     string compress(const Compiled &&v);
