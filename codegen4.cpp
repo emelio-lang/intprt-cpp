@@ -355,7 +355,11 @@ codegen4::operator () (const shared_ptr<Code> c, const shared_ptr<Lambda> envl) 
 
     // 戻り値コピーv.2 envlを用いたい!
     if (envl) {
-        res.body += "*STACK("+to_string(envl->argnames.size()+1)+") = *TOP();\n";
+        if (envl->argnames.size() != 0)
+        // *STACK(1) = *TOP()は実際何の効果もないので省く
+        {
+            res.body += "*STACK("+to_string(envl->argnames.size()+1)+") = *TOP();\n";
+        }
         for (int i = 0; i < (int)envl->argnames.size(); i++) {
             res.body += "MPOP();\n";
             this->stack_height--;
