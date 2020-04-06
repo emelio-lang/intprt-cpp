@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
 //        cout << codegen(root);
         cout << "prepare name hash:\n";
         Compiled result;
-        result = codegen3()(root);
+        result = codegen4()(root, nullptr);
 
 
         ofstream ofs1("compiled/code.c");

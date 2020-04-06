@@ -107,7 +107,40 @@ public:
     Compiled builtin(const string &name);
     Compiled all_arguments_evoked(const vector<shared_ptr<Code>> &args);
     Compiled argument_evoked(const shared_ptr<Code> &args);
-    Compiled operator () (const shared_ptr<Code> c);
+    Compiled operator () (const shared_ptr<Code> c, const shared_ptr<Lambda> enviroment);
+    // v.main <+ v.env
+    string compress(const Compiled &&v);
+    // a += b
+    void paircat(Compiled &a, const Compiled &&b);
+};
+
+class codegen4 {
+private:
+
+    // バインド保留のコード と それの実体（または実体を指すポインタ）があるスタックの絶対位置 のペア
+    deque<pair<string,shared_ptr<Code>>> argstack;
+    deque<shared_ptr<Code>> argstack_code;
+
+    map<string, int> bind;
+    map<string, BindInfo> bindinfo;
+    set<string> in_recursion;
+    int stack_height = 0;
+    bool is_root = true;
+
+public:
+    bool human = false;
+    codegen4() {}
+    codegen4(bool h) : human(h) {}
+    ~codegen4() {}
+    string print_rel(int rel);
+    Compiled evoke_rel(int rel);
+    Compiled copy_rel(int rel);
+    Compiled literal(const string lit);
+    Compiled fuse(const vector<shared_ptr<Code>> fns);
+    Compiled builtin(const string &name);
+    Compiled all_arguments_evoked(const vector<shared_ptr<Code>> &args);
+    Compiled argument_compiled(const string &ident , const shared_ptr<Code> &arg);
+    Compiled operator () (const shared_ptr<Code> c, const shared_ptr<Lambda> enviroment);
     // v.main <+ v.env
     string compress(const Compiled &&v);
     // a += b

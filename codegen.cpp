@@ -197,6 +197,7 @@ void set_arity::operator () (const shared_ptr<Code> c) {
 #include "codegen1.cpp"
 #include "codegen2.cpp"
 #include "codegen3.cpp"
+#include "codegen4.cpp"
 #include "ocamlgen.cpp"
 
 vector<string> split_instr(string instr) {

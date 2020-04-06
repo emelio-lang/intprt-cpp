@@ -57,6 +57,9 @@ vector<string> Code::plain_string() {
 void Code::deep_copy_from(const Code& other) {
     lit = other.lit;
     src = other.src;
+    arity = other.arity;
+
+    // TODO: srcもコピーしないと
 
     // もうすでにnullでないptrを持っているならそれを活かす
     if (other.l) {
@@ -76,6 +79,8 @@ void Code::deep_copy_from(const Code& other) {
 
 void Lambda::deep_copy_from(const Lambda& other) {
     argnames = other.argnames;
+    argarities = other.argarities;
+    argqualities = other.argqualities;
 
     if (other.body) {
         if (!body) body = shared_ptr<Code>(new Code);

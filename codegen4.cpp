@@ -1,4 +1,4 @@
-﻿/***
+/***
  * codegen ver.3
  * C備え付けのスタックと、一本のスタックを用いて計算する
  *
@@ -35,29 +35,18 @@
 
 #include <sstream>
 string
-codegen3::compress(const Compiled &&v) {
+codegen4::compress(const Compiled &&v) {
     return v.body + v.env;
 }
 
 void
-codegen3::paircat(Compiled &x, const Compiled &&v) {
+codegen4::paircat(Compiled &x, const Compiled &&v) {
     x.body += v.body;
     x.env += v.env;
 }
 
-void operator+=(Compiled& lhs, const Compiled&& rhs) {
-    lhs.body += rhs.body;
-    lhs.env += rhs.env;
-}
-
-void operator<<=(string& lhs, const Compiled&& rhs) {
-    lhs += rhs.body + rhs.env;
-}
-
-vector<int> hypes;
-
 // Offsetがrelのスタック内容を実行する
-Compiled codegen3::evoke_rel(int rel) {
+Compiled codegen4::evoke_rel(int rel) {
     if (rel < 0) {
         return Compiled {"(SP+("+to_string(rel-stack_height)+"))->fp();\n"};
     } else {
@@ -66,12 +55,12 @@ Compiled codegen3::evoke_rel(int rel) {
 }
 
 // Offsetがrelのスタック内容をコピーする
-Compiled codegen3::copy_rel(int rel) {
+Compiled codegen4::copy_rel(int rel) {
     return Compiled {"PUSHV(("+print_rel(rel)+")->val);\n"};
 }
 
 // Offsetがrelのスタック内容
-string codegen3::print_rel(int rel) {
+string codegen4::print_rel(int rel) {
     if (rel < 0) {
         return "SP+("+to_string(rel-stack_height)+")";
     } else {
@@ -80,7 +69,7 @@ string codegen3::print_rel(int rel) {
 }
 
 Compiled
-codegen3::literal(const string lit) {
+codegen4::literal(const string lit) {
     if (is_number(lit)) {
         return Compiled {"PUSHV("+lit+");\n"};
     } else {
@@ -90,7 +79,7 @@ codegen3::literal(const string lit) {
 
 
 Compiled
-codegen3::fuse(const vector<shared_ptr<Code>> fns) {
+codegen4::fuse(const vector<shared_ptr<Code>> fns) {
     Compiled res;
 
     // NOTE: only see direct arguments
@@ -125,7 +114,7 @@ codegen3::fuse(const vector<shared_ptr<Code>> fns) {
 }
 
 Compiled
-codegen3::builtin(const string &name) {
+codegen4::builtin(const string &name) {
     Compiled res;
 
     const map<string,string> c_builtin = {
@@ -143,36 +132,61 @@ codegen3::builtin(const string &name) {
 }
 
 Compiled
-codegen3::all_arguments_evoked(const vector<shared_ptr<Code>> &args) {
+codegen4::all_arguments_evoked(const vector<shared_ptr<Code>> &args) {
     Compiled res;
 
+    auto tmp_bind = bind;
     while (!argstack.empty()) {
-        if (argstack_code.back()->arity == 0) {
-            res += copy_rel(argstack.back());
-        } else {
-            res += evoke_rel(argstack.back());
-        }
+        auto arg = argstack.back();
+        // ほんとうはarg.secondコンパイルする前に自身はpopbackする
+        // argとして参照があるので消えないはず
         argstack.pop_back();
-        argstack_code.pop_back();
+        res += this->operator()(arg.second, nullptr);
     }
-
-    auto tmp_bind = this->bind;
-    for (int i = args.size()-1; i >= 0; i--) {
-        // 引数もR1実行
-        res += this->operator()(args[i], nullptr);
-        this->bind = tmp_bind;
-    }
+    bind = tmp_bind;
 
     return res;
 }
 
+// argstackからとったなら解放忘れずに
 Compiled
-codegen3::argument_evoked(const shared_ptr<Code> &c) {
+codegen4::argument_compiled(const string &ident , const shared_ptr<Code> &arg) {
     Compiled res;
 
-    auto tmp_bind = this->bind;
-    res += this->operator()(c, nullptr);
-    this->bind = tmp_bind;
+    if (arg->arity == 0) {
+        {
+            auto tmp_bind = bind;
+            auto tmp_stack = argstack;
+            argstack = {};
+            res.body <<= codegen4::operator()(arg, nullptr);
+            bind = tmp_bind;
+            argstack = tmp_stack;
+        }
+//                        res.body += "PUSHV("+arg.second->lit.val+");\n";
+    } else {
+        res.body += "PUSHF("+ident+");\n";
+        stack_height++;
+
+        res.env += "void "+ident+"() {\n";
+        res.env += "union memory_t *MEM = SP;\n";
+//                if (c->l && c->l->argqualities[binded_with_arg].recursive) {
+//                    // in_recursive.insert(c->l->argnames[binded_with_arg]);
+//                    res.env += "static void(*"+c->l->argnames[binded_with_arg]+")() = F"+to_string(fnidx)+"A"+to_string(i)+";\n";
+//                }
+        {
+            auto tmp_bind = bind;
+            auto tmp_stackh = stack_height;
+            auto tmp_stack = argstack;
+            argstack = {};
+            stack_height = 0;
+            res.env <<= codegen4::operator()(arg, nullptr);
+            bind = tmp_bind;
+            stack_height = tmp_stackh;
+            argstack = tmp_stack;
+        }
+        res.env += "return;\n";
+        res.env += "}\n";
+    }
 
     return res;
 }
@@ -180,7 +194,7 @@ codegen3::argument_evoked(const shared_ptr<Code> &c) {
 
 
 //Compiled
-//codegen3::argument_holded() {
+//codegen4::argument_holded() {
 //    while (!argstack.empty()) {
 //        res.body += evoke_rel(argstack.back());
 //        argstack.pop_back();
@@ -199,10 +213,23 @@ codegen3::argument_evoked(const shared_ptr<Code> &c) {
 // とにかく、codeを処理するのにその上の引数確保情報も必要ということ
 // そんなのcallして帰ってきてからで良いやんという意見もあるけど、名前callの場合面倒だし、そちらで綺麗に解決しないのがhypeを作らないといけなくなった根源かも
 Compiled
-codegen3::operator () (const shared_ptr<Code> c, const shared_ptr<Lambda> envl) {
+codegen4::operator () (const shared_ptr<Code> c, const shared_ptr<Lambda> envl) {
     Compiled res;
 
     cout << *c << endl << endl;
+
+    const unsigned fnidx = function_call_counter++;
+    for (int i = c->args.size()-1; i >= 0; i--) {
+        if (c->args[i]->arity == 0) {
+            argstack.emplace_back(make_pair("", c->args[i]));
+        } else {
+            //int binded_with_arg = binded_with[tmp_stackh];
+            argstack.emplace_back(make_pair("F"+to_string(fnidx)+"A"+to_string(i), c->args[i]));
+//                res.body += "PUSHF(F"+to_string(fnidx)+"A"+to_string(i)+");\n";
+
+        }
+    }
+
 
     if (is_literal(c->lit.val)) {
 //        const unsigned fnidx = function_call_counter++;
@@ -234,9 +261,8 @@ codegen3::operator () (const shared_ptr<Code> c, const shared_ptr<Lambda> envl) 
 //        }
     }
     else {
-        const unsigned fnidx = function_call_counter++;
 
-        hypes.emplace_back(0);
+//        hypes.emplace_back(0);
 
 //        if (c->args.size() != 0 && c->arity == 0) {
 //            res.body += "PUSHV(0); POP();\n";
@@ -244,75 +270,29 @@ codegen3::operator () (const shared_ptr<Code> c, const shared_ptr<Lambda> envl) 
 //            this->stack_height++;
 //        }
 
-        map<int, int> binded_with;  // keyの位置にbindされるべきargnameのindex
-        if (c->l) {
-            auto tmp_stack = argstack;
-            auto tmp_stackh = stack_height;
-            for (int i = c->args.size()-1; i >= 0; i--) {
-                tmp_stackh++;
-                tmp_stack.emplace_back(tmp_stackh);
-            }
+//        map<int, int> binded_with;  // keyの位置にbindされるべきargnameのindex
+//        if (c->l) {
+//            auto tmp_stack = argstack;
+//            auto tmp_stackh = stack_height;
+//            for (int i = c->args.size()-1; i >= 0; i--) {
+//                tmp_stackh++;
+//                tmp_stack.emplace_back(tmp_stackh);
+//            }
 
-            int i = 0, j =0;
-            for (auto a : c->l->argnames) {
-                if (tmp_stack.empty()) {
-                    i++;
-//                    bind[a] = BindInfo{-i};
-                } else {
-                    binded_with[tmp_stack.back()] = j;
-//                    bind[a] = BindInfo{tmp_stack.back()};
-                    tmp_stack.pop_back();
-                }
-                j++;
-            }
-        }
+//            int i = 0, j =0;
+//            for (auto a : c->l->argnames) {
+//                if (tmp_stack.empty()) {
+//                    i++;
+////                    bind[a] = BindInfo{-i};
+//                } else {
+//                    binded_with[tmp_stack.back()] = j;
+////                    bind[a] = BindInfo{tmp_stack.back()};
+//                    tmp_stack.pop_back();
+//                }
+//                j++;
+//            }
+//        }
 
-
-        auto tmp_bind = this->bind;
-        auto tmp_stackh = stack_height;
-        auto tmp_stack = argstack;
-        auto tmp_stack_code = argstack_code;
-        auto tmp_hypes = hypes;
-//        cout << c->args.size() << " arguments {" << endl;
-        for (int i = c->args.size()-1; i >= 0; i--) {
-            // 引数はまとめながらラムダ抽象 - (HACK: arityが0ならR1実行)
-            // 今はまとめはしない TODO: キャプチャーをやらないなら良さそう
-            tmp_stackh++;
-            hypes.clear();
-            tmp_hypes.back()++;
-            this->stack_height = 0;
-            this->argstack = {};
-            tmp_stack.emplace_back(tmp_stackh);
-            tmp_stack_code.emplace_back(c->args[i]);
-
-            if (c->args[i]->arity == 0) {
-                res += this->operator()(c->args[i], nullptr);
-            } else {
-                int binded_with_arg = binded_with[tmp_stackh];
-                res.body += "PUSHF(F"+to_string(fnidx)+"A"+to_string(i)+");\n";
-                res.env += "void F"+to_string(fnidx)+"A"+to_string(i)+"() {\n";
-                res.env += "union memory_t *MEM = SP;\n";
-                if (c->l && c->l->argqualities[binded_with_arg].recursive) {
-                    // in_recursive.insert(c->l->argnames[binded_with_arg]);
-                    res.env += "static void(*"+c->l->argnames[binded_with_arg]+")() = F"+to_string(fnidx)+"A"+to_string(i)+";\n";
-                }
-                res.env <<= this->operator()(c->args[i], nullptr);
-                res.env += "return;\n";
-                res.env += "}\n";
-            }
-        }
-//        cout << "}" << endl;
-        this->bind = tmp_bind;
-        this->stack_height = tmp_stackh;
-        this->argstack = tmp_stack;
-        this->argstack_code = tmp_stack_code;
-        hypes = tmp_hypes;
-
-        // ここでhypeが解決されるかどうか
-        // 解決されるなら0にしておいて以降のbodyを生成する
-        // 奥から、解決条件で累積していくみたいな処理
-        bool beHypeResolved = c->args.size() != 0 && c->arity == 0;
-        int local_hype = hypes.size();
 
         if (c->l) {
             int i = 0, j=0;
@@ -322,23 +302,19 @@ codegen3::operator () (const shared_ptr<Code> c, const shared_ptr<Lambda> envl) 
                     bind[a] = -i;
                     bindinfo[a] = BindInfo{nullptr};
                 } else {
-                    bind[a] = this->argstack.back();
-                    bindinfo[a] = BindInfo{this->argstack_code.back()};
+                    auto arg = this->argstack.back();
+
+                    res += argument_compiled(arg.first, arg.second);
                     this->argstack.pop_back();
-                    this->argstack_code.pop_back();
+
+                    bind[a] = stack_height;
+                    bindinfo[a] = BindInfo{arg.second};
                 }
                 j++;
             }
 
             auto tmp_bind = this->bind;
             res += this->operator()(c->l->body, c->l);
-            if (beHypeResolved) {
-                // local_hypeまでhypeを折りたたむ
-                for (int i = hypes.size()-1; i >= local_hype; i--) {
-                    hypes[local_hype-1] += hypes.back();
-                    hypes.pop_back();
-                }
-            }
             this->bind = tmp_bind;
         }
         else {
@@ -348,6 +324,9 @@ codegen3::operator () (const shared_ptr<Code> c, const shared_ptr<Lambda> envl) 
             //     res.body += c->lit.val+"();\n";
             // } else
             if (!bind.contains(c->lit.val)) {
+
+                // TODO: 引数のコンパイル
+
                 // とりあえず何もミスってなければ再帰
                 res.body += c->lit.val + "(";
 
@@ -355,44 +334,23 @@ codegen3::operator () (const shared_ptr<Code> c, const shared_ptr<Lambda> envl) 
             // 参照先コードのarityを見て、0なら値をコピってスタックにのっけるだけ
             } else if (!bindinfo[c->lit.val].code || bindinfo[c->lit.val].code->arity == 0) {
                 res += copy_rel(bind[c->lit.val]);
+                stack_height++;
             // それ以外なら、ちゃんとcallする
             } else {
+                for (int i = 0; i < bindinfo[c->lit.val].code->arity; i++) {
+                    auto arg = this->argstack.back();
+
+                    res += argument_compiled(arg.first, arg.second);
+                    this->argstack.pop_back();
+                }
+
                 res += evoke_rel(bind[c->lit.val]);
+                stack_height++;
             }
-            this->stack_height++;
 
             cout << "ll" << endl;
             cout << res.body << endl;
         }
-
-
-
-        // 戻り値コピー
-        // TODO: pointerより大きい時は、ヒープに実体を置いてとかしないと駄目かもね...
-//        if (beHypeResolved) {
-//            if (c->l) {
-//                // 明日：hypeをメンバにして、解決するまでどんどん足していく。ここで解決。
-//                res.body += "*STACK("+to_string(hypes.back()+1)+") = *TOP();\n";
-//                // 部分適用なら（c->args.size() == c->l->body->arityでないなら）、
-//                // MPOPはc->l->body->arityを発行する
-//                for (int i = hypes.back()/*TODO*/; i >= 1; i--) {
-//                    res.body += "MPOP();\n";
-//                    this->stack_height--;
-//                }
-//            } else {
-//                res.body += "*STACK("+to_string(1+2)+") = *TOP();\n";
-//                // NOTE: ここは内容不明のhikisuu文字。
-//                // (|a b| a 3)とか
-//                // arityは種システムを制作してarityを保証してから
-//                // 今は値と信じて１と決め打ちしておく
-
-//                for (int i = 1 + (1 == 0 ? 0 : 1)/*いらない方の戻り値分*/; i >= 1; i--) {
-//                    res.body += "MPOP();\n";
-//                    this->stack_height--;
-//                }
-//            }
-//            hypes.pop_back();
-//        }
     }
 
     // 戻り値コピーv.2 envlを用いたい!
