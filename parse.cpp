@@ -34,6 +34,59 @@
     return l;
 }
 
+// O - O - O -> O, (O), (O - O -> O)
+{- PARSE <> TypeSignature <> type_signature -}
+{
+    TypeSignature typesig;
+    if (NOW == "(") {
+        {- SKIP <> "(" -}
+    }
+
+    while (NOW != ">") {
+        if (NOW == "(") {
+            TypeSignature tmp;
+            {- MONAD <> tmp <> TypeSignature <> type_signature -}
+            typesig.from.push_back(make_shared<TypeSignature>(tmp));
+        } else {
+            typesig.from.push_back(NOW);
+            p.idx++;
+        }
+
+        // NOTE: ->があるかどうかでココの内容をfromに入れてよいかが決まるが、それは今はわからないので
+        // NOW が)だったり、とにかく-でない場合はそこで終了、関数型でないとみなしto = fromする
+        if (NOW != "-") {
+            if (NOW == ")") {
+                {- SKIP <> ")" -}
+            }
+            typesig = TypeSignature(typesig.from);
+            typesig.from = {};
+            return typesig;
+        }
+
+        {- SKIP <> "-" -}
+    }
+
+    {- SKIP <> ">" -}
+
+    if (NOW == "(") {
+        TypeSignature tmp;
+        {- MONAD <> tmp <> TypeSignature <> type_signature -}
+        typesig.to = make_shared<TypeSignature>(tmp);
+    } else {
+        typesig.to = NOW;
+        p.idx++;
+    }
+
+    if (NOW == ")") {
+        {- SKIP <> ")" -}
+        return typesig;
+    }
+
+
+    return typesig;
+}
+
+
 {- PARSE <> shared_ptr<Lambda> <> lambda -}
 {
     shared_ptr<Lambda> l(new Lambda);
@@ -50,23 +103,36 @@
                 break;
             } else {
                 l->argnames.emplace_back(NOW);
+                l->argarities.emplace_back(0);
                 l->argqualities.emplace_back(ArgQuality {});
 
-                if (NEXT == "*") {
-                    // 再帰
-                    {- SKIP <> NOW -}
-                    l->argqualities.back().recursive = true;
+                if (NEXT == ":") {
+                    p.idx++;
+                    {- SKIP <> ":" -}
+                    TypeSignature tmp;
+                    {- MONAD <> tmp <> TypeSignature <> type_signature -}
+                    l->argtypes.push_back(tmp);
+                } else {
+                    p.idx++;
                 }
 
-                // 種システム：酒の指定があればパース
-                if (NEXT == "(") {
-                    {- SKIP <> NOW -}
-                    {- SKIP <> "(" -}
-                    l->argarities.emplace_back(stoi(NOW));
-                    {- SKIP <> NOW -}
-                } else {
-                    l->argarities.emplace_back(-1);
-                }
+                p.idx--;
+// codegen4用
+//                if (NEXT == "*") {
+//                    // 再帰
+//                    {- SKIP <> NOW -}
+//                    l->argqualities.back().recursive = true;
+//                }
+
+//                // 種システム：酒の指定があればパース
+//                if (NEXT == "(") {
+//                    {- SKIP <> NOW -}
+//                    {- SKIP <> "(" -}
+//                    l->argarities.emplace_back(stoi(NOW));
+//                    {- SKIP <> NOW -}
+//                } else {
+//                    l->argarities.emplace_back(-1);
+//                }
             }
         }
     }
@@ -107,19 +173,20 @@
     c->src.beg = next(p.tknvals.begin(), p.idx);
 
 //    {- SKIP <> "(" -}
-
-    if (NOW == "(") {
-        {- MONAD <> c->l <> shared_ptr<Lambda> <> lambda -}
-    } else {
-        {- MONAD <> c->lit <> Literal <> literal -}
-    }
-
-    while (p.idx < p.tknvals.size()) {
-        if (NOW == ")" || NOW == "") {
-            break;
+    if (NOW != ")") {
+        if (NOW == "(") {
+            {- MONAD <> c->l <> shared_ptr<Lambda> <> lambda -}
+        } else {
+            {- MONAD <> c->lit <> Literal <> literal -}
         }
 
-        {- MONAD_F <> c->args.emplace_back <> shared_ptr<Code> <> argument -}
+        while (p.idx < p.tknvals.size()) {
+            if (NOW == ")" || NOW == "") {
+                break;
+            }
+
+            {- MONAD_F <> c->args.emplace_back <> shared_ptr<Code> <> argument -}
+        }
     }
 
 
