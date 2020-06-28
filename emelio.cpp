@@ -72,7 +72,8 @@ int main(int argc, char **argv) {
         cout << *root << endl;
 
         rename_variables(root);
-        set_arity()(root);
+//        set_arity()(root);
+        set_type()(root);
 
         cout << *root << endl;
 
@@ -80,7 +81,10 @@ int main(int argc, char **argv) {
 //        cout << codegen(root);
         cout << "prepare name hash:\n";
         Compiled result;
-        result = codegen4()(root, nullptr);
+        result = codegen6()(root);
+
+        cout << "a" << endl;
+//        result = codegen5()(root, nullptr, true);
 
 
         ofstream ofs1("compiled/code.c");
@@ -88,11 +92,22 @@ int main(int argc, char **argv) {
         ofs1 << result.body << endl;
         ofs2 << result.env << endl;
 
-        cout << endl << endl;
-        cout << result.body << endl << endl;
-        cout << result.env << endl << endl;
+        ofstream ofs3("compiled/code5.c");
+        ofs3 << "#include <stdio.h>" << endl;
+        ofs3 << "int __main__() { " << endl;
+        ofs3 << result.env << endl << endl;
+        ofs3 << "return " << result.body << ";" << endl;
+        ofs3 << "}" << endl;
+        ofs3 << "void main() { printf(\"%d\\n\", __main__()); }" << endl << endl;
 
-        
+        cout << "#include <stdio.h>" << endl;
+        cout << "int __main__() { " << endl;
+        cout << result.env << endl;
+        cout << "return " << result.body << ";" << endl;
+        cout << "}" << endl;
+        cout << "void main() { printf(\"%d\\n\", __main__()); }" << endl << endl;
+
+
 //         cout << *root << endl;
 
 

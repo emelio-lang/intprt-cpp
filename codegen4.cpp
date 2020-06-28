@@ -60,6 +60,8 @@ Compiled codegen4::copy_rel(int rel) {
 }
 
 // Offsetがrelのスタック内容
+// relがマイナスのときは直前の関数呼び出しまでの引数を表す
+// 関数呼び出し時にはstack_heightは0に初期化され、そこからまた追跡を始める
 string codegen4::print_rel(int rel) {
     if (rel < 0) {
         return "SP+("+to_string(rel-stack_height)+")";
@@ -86,21 +88,55 @@ codegen4::fuse(const vector<shared_ptr<Code>> fns) {
     Guard guard = get_guard(fns);
     GuardType gtype = get_guard_type(fns);
 
+
+
     switch (gtype) {
     case GTYPE_COUNTABLE_FINITE: {
+        // TODO:
+        // (|x| ... )
+        // (|3| ... )
+        // がfuseされていた時、引数は比較用に実体化する（計算する）が、計算した後3の方に行ったらxは使えないので最初の時点で開放するのもありかも（節約）
+
+        int i = 0, j=0;
+        for (auto a : guard.countable->l->argnames) {
+            if (this->argstack.empty()) {
+                i++;
+                bind[a] = -i;
+                bindinfo[a] = BindInfo{nullptr};
+            } else {
+                auto arg = this->argstack.back();
+
+                res += argument_compiled(a, arg.second);
+                this->argstack.pop_back();
+
+                bind[a] = stack_height;
+                bindinfo[a] = BindInfo{arg.second};
+            }
+            j++;
+        }
+
+        // fuseされた関数の呼び出しは (...) 3 のような即席関数のように感じますが、実行時にしかわからない比較がついてくるので関数呼び出しのような形に
+
         res.body += "if (false) ;\n";
         for (auto p : guard.finites) {
-            auto tmp_bind = this->bind;
-            this->stack_height = 0;
-            this->argstack = {};
-            res.body += "else if (("+print_rel(-1)+")->val=="+p.first+") {\n";
-            res += this->operator ()(p.second, nullptr/*TODO*/);
+            // TODO: fuse の即席実行では-1ではない。。。
+            res.body += "else if (("+/*print_rel(-1)*/string("SP-1")+")->val=="+p.first+") {\n";
+            {
+                auto tmp_bind = bind;
+                auto tmp_stack = argstack;
+                auto tmp_stackh = stack_height;
+                argstack = {};
+                res += codegen4::operator()(p.second, guard.countable->l);
+                bind = tmp_bind;
+                argstack = tmp_stack;
+                stack_height = tmp_stackh;
+            }
             res.body += "}\n";
-            this->bind = tmp_bind;
         }
+
         res.body += "else {\n";
         auto tmp_bind = this->bind;
-        res += this->operator ()(guard.countable, nullptr/*TODO*/);
+        res += this->operator ()(guard.countable->l->body, guard.countable->l);
         this->bind = tmp_bind;
         res.body += "}\n";
     } break;
@@ -136,19 +172,25 @@ codegen4::all_arguments_evoked(const vector<shared_ptr<Code>> &args) {
     Compiled res;
 
     auto tmp_bind = bind;
-    while (!argstack.empty()) {
-        auto arg = argstack.back();
+    auto tmp_argstack = argstack;
+    argstack = {};
+    while (!tmp_argstack.empty()) {
+        auto arg = tmp_argstack.front();
         // ほんとうはarg.secondコンパイルする前に自身はpopbackする
         // argとして参照があるので消えないはず
-        argstack.pop_back();
+        tmp_argstack.pop_front();
         res += this->operator()(arg.second, nullptr);
     }
     bind = tmp_bind;
+    argstack = {};
+
 
     return res;
 }
 
-// argstackからとったなら解放忘れずに
+
+// NOTE: argstackからとったなら解放忘れずに
+// argとして引数となるCodeを渡すと、関数呼び出しの際に引数の実体化として一般的に行われる処理をargで行います
 Compiled
 codegen4::argument_compiled(const string &ident , const shared_ptr<Code> &arg) {
     Compiled res;
@@ -246,6 +288,11 @@ codegen4::operator () (const shared_ptr<Code> c, const shared_ptr<Lambda> envl) 
     else if (builtin_functions.contains(c->lit.val)) {
         // res.body += "PUSHV(0); POP();\n";
         if (c->lit.val == "fuse") {
+            // 無駄にargstack積んでるので崩す
+            for (int i = 0; i < c->args.size(); i++) {
+                // TODO: ここ大丈夫？
+                argstack.pop_back();
+            }
             res = fuse(c->args);
         } else {
             res += all_arguments_evoked(c->args);
@@ -304,7 +351,7 @@ codegen4::operator () (const shared_ptr<Code> c, const shared_ptr<Lambda> envl) 
                 } else {
                     auto arg = this->argstack.back();
 
-                    res += argument_compiled(arg.first, arg.second);
+                    res += argument_compiled(a, arg.second);
                     this->argstack.pop_back();
 
                     bind[a] = stack_height;
@@ -326,6 +373,13 @@ codegen4::operator () (const shared_ptr<Code> c, const shared_ptr<Lambda> envl) 
             if (!bind.contains(c->lit.val)) {
 
                 // TODO: 引数のコンパイル
+                for (int i = 0; i < argstack.size(); i++) {
+                    auto arg = this->argstack.front();
+
+                    res += argument_compiled(arg.first, arg.second);
+                    this->argstack.pop_front();
+                }
+
 
                 // とりあえず何もミスってなければ再帰
                 res.body += c->lit.val + "(";
@@ -338,10 +392,10 @@ codegen4::operator () (const shared_ptr<Code> c, const shared_ptr<Lambda> envl) 
             // それ以外なら、ちゃんとcallする
             } else {
                 for (int i = 0; i < bindinfo[c->lit.val].code->arity; i++) {
-                    auto arg = this->argstack.back();
+                    auto arg = this->argstack.front();
 
                     res += argument_compiled(arg.first, arg.second);
-                    this->argstack.pop_back();
+                    this->argstack.pop_front();
                 }
 
                 res += evoke_rel(bind[c->lit.val]);

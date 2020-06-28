@@ -9,6 +9,7 @@
 
 #include "emelio.h"
 
+
 enum GuardType { GTYPE_COUNTABLE_FINITE, GTYPE_FINITE };
 struct Guard {
     vector<pair<string, shared_ptr<Code>>> finites;
@@ -28,6 +29,21 @@ public:
         if (pb) bind = *pb;
     }
     ~set_arity() {
+    }
+    void operator () (const shared_ptr<Code> c);
+};
+
+class set_type {
+private:
+    map<string, TypeSignature> bind;
+    map<string, shared_ptr<Lambda>> type_constructors;
+    stack<shared_ptr<Code>> argstack;
+public:
+    set_type(map<string, TypeSignature> *pb = nullptr, stack<shared_ptr<Code>> *pa = nullptr) {
+        if (pa) argstack = *pa;
+        if (pb) bind = *pb;
+    }
+    ~set_type() {
     }
     void operator () (const shared_ptr<Code> c);
 };
@@ -141,6 +157,72 @@ public:
     Compiled all_arguments_evoked(const vector<shared_ptr<Code>> &args);
     Compiled argument_compiled(const string &ident , const shared_ptr<Code> &arg);
     Compiled operator () (const shared_ptr<Code> c, const shared_ptr<Lambda> enviroment);
+    // v.main <+ v.env
+    string compress(const Compiled &&v);
+    // a += b
+    void paircat(Compiled &a, const Compiled &&b);
+};
+
+class codegen5 {
+private:
+
+    // バインド保留のコード と それの実体（または実体を指すポインタ）があるスタックの絶対位置 のペア
+    deque<pair<string,shared_ptr<Code>>> argstack;
+    deque<shared_ptr<Code>> argstack_code;
+
+    deque<string> reserved;
+    map<string, string> reserved_bind;
+
+    map<string, int> bind;
+    map<string, BindInfo> bindinfo;
+    set<string> in_recursion;
+    int stack_height = 0;
+    bool is_root = true;
+
+public:
+    bool human = false;
+    codegen5() {}
+    codegen5(bool h) : human(h) {}
+    ~codegen5() {}
+    string print_rel(int rel);
+    Compiled evoke_rel(int rel);
+    Compiled copy_rel(int rel);
+    Compiled literal(const string lit);
+    Compiled fuse(const vector<shared_ptr<Code>> fns);
+    Compiled builtin(const string &name);
+    Compiled all_arguments_evoked();
+    string get_name(string name);
+    Compiled argument_evoked( const shared_ptr<Code> &arg);
+    Compiled argument_compiled(const string &ident , const shared_ptr<Code> &arg);
+//    string argument_signature(const Type &);
+//    string type_signature(const deque<AtomType> &type, const string &name);
+
+    string vardef(const string &name, const TypeSignature &typesig);
+    string argdef(const TypeSignature &typesig, bool reserve = false);
+
+    Compiled operator () (const shared_ptr<Code> c, const shared_ptr<Lambda> enviroment, bool);
+    // v.main <+ v.env
+    string compress(const Compiled &&v);
+    // a += b
+    void paircat(Compiled &a, const Compiled &&b);
+};
+
+class codegen6 {
+private:
+    stack<string> barstack;
+    stack<shared_ptr<Code>> argstack;
+    static map<string, shared_ptr<Code>> bind;
+    static map<string, shared_ptr<Lambda>> type_constructors; // TODO: スコープいいの？
+    int pseudo_func_counter = 0;
+
+public:
+    codegen6() {}
+    ~codegen6() {}
+    string print_type_to(const Type &ty);
+    string print_type_from(const deque<Type> &tys, const shared_ptr<Lambda> &lam);
+    string print_decl(string name, const TypeSignature &type);
+    string print_def(string name, const shared_ptr<Code>& code);
+    Compiled operator () (const shared_ptr<Code> &);
     // v.main <+ v.env
     string compress(const Compiled &&v);
     // a += b

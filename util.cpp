@@ -58,6 +58,7 @@ void Code::deep_copy_from(const Code& other) {
     lit = other.lit;
     src = other.src;
     arity = other.arity;
+    type.deep_copy_from(other.type);
 
     // TODO: srcもコピーしないと
 
@@ -75,12 +76,14 @@ void Code::deep_copy_from(const Code& other) {
         copied->deep_copy_from(*c);
         args.push_back(copied);
     }
+
 }
 
 void Lambda::deep_copy_from(const Lambda& other) {
     argnames = other.argnames;
     argarities = other.argarities;
     argqualities = other.argqualities;
+    type.deep_copy_from(other.type);
 
     if (other.body) {
         if (!body) body = shared_ptr<Code>(new Code);
@@ -181,7 +184,7 @@ ostream& operator<<(ostream& stream, const Literal& lit) {
 }
 
 ostream& operator<<(ostream& stream, Lambda *l) {
-    stream << "(λ ";
+    stream << "(λ:" << l->type.to_string() << " ";
     for (auto a : l->argnames) stream << a << " ";
     stream << *l->body << ")" << endl;
     return stream;
@@ -198,6 +201,8 @@ ostream& operator<<(ostream& stream, const Code& c) {
     stream << "[";
     for (const auto &a : c.args) stream << *a << ",";
     stream << "]";
+
+    stream << ":" << c.type.to_string();
     return stream;
 }
 
