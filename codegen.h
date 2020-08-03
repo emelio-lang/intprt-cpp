@@ -213,14 +213,17 @@ private:
     stack<shared_ptr<Code>> argstack;
     static map<string, shared_ptr<Code>> bind;
     static map<string, shared_ptr<Lambda>> type_constructors; // TODO: スコープいいの？
+    // static map<string, DataStructure> data_bind;
     int pseudo_func_counter = 0;
 
 public:
     codegen6() {}
     ~codegen6() {}
-    string print_type_to(const Type &ty);
-    string print_type_from(const deque<Type> &tys, const shared_ptr<Lambda> &lam);
-    string print_decl(string name, const TypeSignature &type);
+    // string print_data_structure(const DataStructure &ds);
+    // DataStructure parse_data_structure(const shared_ptr<Code> &c);
+    string print_type_to(const TypeSignature &ty);
+    string print_type_from(const deque<TypeSignature> &tys, const shared_ptr<Lambda> &lam);
+    string print_decl(string name, const TypeSignature &type, bool pointer=false);
     string print_def(string name, const shared_ptr<Code>& code);
     Compiled operator () (const shared_ptr<Code> &);
     // v.main <+ v.env

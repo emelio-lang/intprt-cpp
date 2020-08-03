@@ -19,6 +19,8 @@
 #include <array>
 #include <map>
 
+using namespace std;
+
 void ASSERT(bool glass, std::string msg);
 
 vector<string> split(const string &s, char delim);
@@ -36,22 +38,15 @@ bool is_string_literal(const std::string& s);
 bool is_literal(const std::string& s);
 bool is_builtin(const std::string& s);
 
-bool is_computed(const shared_ptr<Code> &c);
 
 
 std::string random_string( size_t length );
 std::string random_sane_string( size_t length );
 std::string random_saneupper_string( size_t length );
+
 bool is_all_upper(string &s);
 
 int maxzero(int n);
-
-ostream& operator<<(ostream& stream, const Literal&);
-ostream& operator<<(ostream& stream, const Code&);
-ostream& operator<<(ostream& stream, const Lambda&);
-ostream& operator<<(ostream& stream, Lambda*);
-
-ostream& operator<<(ostream& stream, const pair<string,string>&&);
 
 #define UTIL_H
 #endif

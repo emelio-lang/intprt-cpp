@@ -28,16 +28,16 @@ int main(int argc, char **argv) {
         shared_ptr<Code> root = code(pf);
         extract_all_notations(root, true);
 
-        rename_variables(root);
-        auto tmp = codegen2()(root);
-        auto body = fasm(tmp.root);
-        auto env = fasm(tmp.env);
+        // rename_variables(root);
+        // auto tmp = codegen2()(root);
+        // auto body = fasm(tmp.root);
+        // auto env = fasm(tmp.env);
 
-        ofstream ofs1("compiled/code.inc");
-        ofstream ofs2("compiled/env.inc");
+        // ofstream ofs1("compiled/code.inc");
+        // ofstream ofs2("compiled/env.inc");
 
-        ofs1 << body << endl;
-        ofs2 << env << endl;
+        // ofs1 << body << endl;
+        // ofs2 << env << endl;
         
         cout.rdbuf(back);
         
@@ -65,47 +65,46 @@ int main(int argc, char **argv) {
         ParserFlow pf = {tkn.tokenvals, 0};
 
         shared_ptr<Code> root = code(pf);
-//        cout << *root << endl;
+        cout << *root << endl;
+        // set_type()(root);
+        // cout << *root << endl;
         
-        extract_all_notations(root, true);
-
-        cout << *root << endl;
-
-        rename_variables(root);
+        // extract_all_notations(root, true);
+        // cout << *root << endl;
+        // rename_variables(root);
 //        set_arity()(root);
-        set_type()(root);
+//        set_type()(root);
 
-        cout << *root << endl;
+//        cout << *root << endl;
 
 //        cout << transpile(root, "c");
 //        cout << codegen(root);
-        cout << "prepare name hash:\n";
-        Compiled result;
-        result = codegen6()(root);
+//        cout << "prepare name hash:\n";
+//        Compiled result;
+//        result = codegen6()(root);
 
-        cout << "a" << endl;
 //        result = codegen5()(root, nullptr, true);
 
 
-        ofstream ofs1("compiled/code.c");
-        ofstream ofs2("compiled/env.c");
-        ofs1 << result.body << endl;
-        ofs2 << result.env << endl;
+        // ofstream ofs1("compiled/code.c");
+        // ofstream ofs2("compiled/env.c");
+        // ofs1 << result.body << endl;
+        // ofs2 << result.env << endl;
 
-        ofstream ofs3("compiled/code5.c");
-        ofs3 << "#include <stdio.h>" << endl;
-        ofs3 << "int __main__() { " << endl;
-        ofs3 << result.env << endl << endl;
-        ofs3 << "return " << result.body << ";" << endl;
-        ofs3 << "}" << endl;
-        ofs3 << "void main() { printf(\"%d\\n\", __main__()); }" << endl << endl;
+        // ofstream ofs3("compiled/code5.c");
+        // ofs3 << "#include <stdio.h>" << endl;
+        // ofs3 << "int __main__() { " << endl;
+        // ofs3 << result.env << endl << endl;
+        // ofs3 << "return " << result.body << ";" << endl;
+        // ofs3 << "}" << endl;
+        // ofs3 << "void main() { printf(\"%d\\n\", __main__()); }" << endl << endl;
 
-        cout << "#include <stdio.h>" << endl;
-        cout << "int __main__() { " << endl;
-        cout << result.env << endl;
-        cout << "return " << result.body << ";" << endl;
-        cout << "}" << endl;
-        cout << "void main() { printf(\"%d\\n\", __main__()); }" << endl << endl;
+        // cout << "#include <stdio.h>" << endl;
+        // cout << "int __main__() { " << endl;
+        // cout << result.env << endl;
+        // cout << "return " << result.body << ";" << endl;
+        // cout << "}" << endl;
+        // cout << "void main() { printf(\"%d\\n\", __main__()); }" << endl << endl;
 
 
 //         cout << *root << endl;

@@ -5,102 +5,13 @@
    $Creator: Creative GP $
    $Notice: (C) Copyright 2019 by Creative GP. All Rights Reserved. $
    ======================================================================== */
+/*
+  util.hで定義されている、標準ライブラリデータ構造に対するユーティリィー関数をここに書いていく
+ */
 
-#include "emelio.h"
 #include "util.h"
+#include <cassert>
 
-#include <cctype>
-#include <locale>
-#include <sstream>
-
-
-
-
-
-// Code::Code(const Code& other) {
-//     lit = other.lit;
-//     src = other.src;
-    
-//     if (other.l) {
-//         l = unique_ptr<Lambda>(new Lambda);
-//         *l = *other.l;
-//     } else {
-//         l = unique_ptr<Lambda>(nullptr);
-//     }
-
-//     for (Code c : other.args) {
-//         args.push_back(Code(c));
-//     }
-// }
-
-vector<string> Code::plain_string() {
-    vector<string> res = {};
-
-    if (this->lit.val != "") res.push_back(this->lit.val);
-
-    for (auto a : this->args) {
-        vector<string> const tmp = a->plain_string();
-        res.reserve(res.size() + distance(tmp.begin(),tmp.end()));
-        res.insert(res.end(),tmp.begin(),tmp.end());
-    }
-
-    if (this->l) {
-        vector<string> const tmp = this->l->body->plain_string();
-        res.reserve(res.size() + distance(tmp.begin(),tmp.end()));
-        res.insert(res.end(),tmp.begin(),tmp.end());
-    }
-
-    return res;
-}
-
-
-void Code::deep_copy_from(const Code& other) {
-    lit = other.lit;
-    src = other.src;
-    arity = other.arity;
-    type.deep_copy_from(other.type);
-
-    // TODO: srcもコピーしないと
-
-    // もうすでにnullでないptrを持っているならそれを活かす
-    if (other.l) {
-        if (!l) l = shared_ptr<Lambda>(new Lambda);
-        l->deep_copy_from(*other.l);
-    } else {
-        l = shared_ptr<Lambda>(nullptr);
-    }
-
-    args.clear();
-    for (const shared_ptr<Code> &c : other.args) {
-        shared_ptr<Code> copied (new Code);
-        copied->deep_copy_from(*c);
-        args.push_back(copied);
-    }
-
-}
-
-void Lambda::deep_copy_from(const Lambda& other) {
-    argnames = other.argnames;
-    argarities = other.argarities;
-    argqualities = other.argqualities;
-    type.deep_copy_from(other.type);
-
-    if (other.body) {
-        if (!body) body = shared_ptr<Code>(new Code);
-        body->deep_copy_from(*other.body);
-    }
-
-    // fused.clear();
-    // for (const shared_ptr<Lambda> &l : other.fused) {
-    //     shared_ptr<Lambda> copied (new Lambda);
-    //     copied->deep_copy_from(*l);
-    //     fused.push_back(copied);
-    // }
-}
-
-bool is_computed(const shared_ptr<Code> &c) {
-    return (c && !c->l);
-}
 
 // bool is_fusable(const shared_ptr<Code> &c) {
 //     return c->args.size() == 0;
@@ -175,56 +86,6 @@ std::basic_string<Char, Traits, Allocator> operator *
 (size_t n, const std::basic_string<Char, Traits, Allocator>& s)
 {
    return s * n;
-}
-
-
-ostream& operator<<(ostream& stream, const Literal& lit) {
-    stream << "<" << lit.val << ">";
-    return stream;
-}
-
-ostream& operator<<(ostream& stream, Lambda *l) {
-    stream << "(λ:" << l->type.to_string() << " ";
-    for (auto a : l->argnames) stream << a << " ";
-    stream << *l->body << ")" << endl;
-    return stream;
-}
-
-ostream& operator<<(ostream& stream, const Code& c) {
-    stream << c.arity;
-    
-    if (c.l) {
-        stream << *c.l;
-    } else if (c.lit.val != "") {
-        stream << "(λ " << c.lit << ")";
-    }
-    stream << "[";
-    for (const auto &a : c.args) stream << *a << ",";
-    stream << "]";
-
-    stream << ":" << c.type.to_string();
-    return stream;
-}
-
-ostream& operator<<(ostream& stream, const pair<string,string>&& p) {
-    stream << "(" << p.first << ", " << p.second << ")" << endl;
-    return stream;
-}
-
-ostream& operator<<(ostream& stream, const Lambda& l) {
-    // if (l.fused.size() == 0) {
-        stream << "(λ ";
-        for (auto a : l.argnames) stream << a << " ";
-        if (l.body) stream << *l.body << ")" << endl;
-        else stream << "--NO BODY LAMBDA--" << ")" << endl;
-    // } else {
-    //     stream << "(λ-fuse ";
-    //     for (const shared_ptr<Lambda> fus : l.fused) {
-    //         stream << *fus;
-    //     }
-    //     stream << ")" << endl;
-    // }
-    return stream;
 }
 
 

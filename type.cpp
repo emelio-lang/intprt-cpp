@@ -43,6 +43,7 @@ void wrap(TypeSignature &typesig, const TypeSignature &wrp) {
 }
 
 
+// (A|B)->C   ====>  (A->C|B->C)
 void _normalize_fn_sum(TypeSignature &typesig) {
     // (A1|A2|A3|...) -> C
     if (MATCHS(TypeFn)(typesig)) {
@@ -61,8 +62,9 @@ void _normalize_fn_sum(TypeSignature &typesig) {
         
                 for (const auto &e : codom_sum->sums) {
                     from = e;
-                    new_sumtype.sums.emplace_back(shared_ptr<TypeFn>(new TypeFn));
-                    deep_copy_from(new_sumtype.sums.back(), outer_fn);
+                    TypeSignature tmp = shared_ptr<TypeFn>(new TypeFn);
+                    deep_copy_from(tmp, outer_fn);
+                    new_sumtype.add_type(tmp);
                 }
                 typesig = make_shared<TypeSum>(new_sumtype);
                 break;
@@ -84,6 +86,7 @@ void _normalize_fn_sum(TypeSignature &typesig) {
     }
 }
 
+// A->(B C)   ====>  (A->B A->C)
 void _normalize_fn_prod(TypeSignature &typesig) {
     // (A1|A2|A3|...) -> C
     if (MATCHS(TypeFn)(typesig)) {
@@ -120,6 +123,8 @@ void _normalize_fn_prod(TypeSignature &typesig) {
     }
 }
 
+// (A | (B|C))   ====>  (A|B|C)
+// (A (B C))   ====>  (A B C)
 void _normalize_simile(TypeSignature &typesig) {
     // (A1|A2|A3|...) -> C
     if (MATCHS(TypeFn)(typesig)) {
@@ -137,10 +142,10 @@ void _normalize_simile(TypeSignature &typesig) {
             _normalize_simile(e);
             if (MATCHS(TypeSum)(e)) {
                 for (auto &j : PURES(TypeSum)(e)->sums) {
-                    resp->sums.push_back(j);
+                    resp->add_type(j);
                     i++;
                 }
-            } else resp->sums.push_back(e);
+            } else resp->add_type(e);
         }
         
         typesig = res;
@@ -179,14 +184,16 @@ void normalize(TypeSignature &typesig) {
     }
     while (true) {
         _normalize_simile(typesig);
-        cout << to_string(typesig) << endl;
         if (equal(tmp, typesig)) break;
         deep_copy_from(tmp, typesig);
     }
 }
 
 TypeSignature normalized(const TypeSignature &typesig) {
-    return typesig;
+    TypeSignature res;
+    deep_copy_from(res, typesig);
+    normalize(res);
+    return res;
 }
 
 bool equal(const TypeSignature &ts1, const TypeSignature &ts2) {
@@ -199,10 +206,9 @@ bool equal(const TypeSignature &ts1, const TypeSignature &ts2) {
         }
         return res;
     } else if (MATCHS(TypeSum)(ts1) && MATCHS(TypeSum)(ts2)) {
-        for (int i = 0; i < PURES(TypeSum)(ts1)->sums.size(); ++i) {
-            res = res && equal(PURES(TypeSum)(ts1)->sums[i], PURES(TypeSum)(ts2)->sums[i]);
-        }
-        return res;
+        unordered_set<TypeSignature> a(PURES(TypeSum)(ts1)->sums.begin(), PURES(TypeSum)(ts1)->sums.end());
+        unordered_set<TypeSignature> b(PURES(TypeSum)(ts2)->sums.begin(), PURES(TypeSum)(ts2)->sums.end());
+        return a == b;
     } else if (MATCHS(TypeProduct)(ts1) && MATCHS(TypeProduct)(ts2)) {
         for (int i = 0; i < PURES(TypeProduct)(ts1)->products.size(); ++i) {
             res = res && equal(PURES(TypeProduct)(ts1)->products[i], PURES(TypeProduct)(ts2)->products[i]);
@@ -223,9 +229,10 @@ void deep_copy_from(TypeSignature &ts_dst, const TypeSignature &ts_src) {
         }
     } else if (MATCHS(TypeSum)(ts_src)) {
         ts_dst = shared_ptr<TypeSum>(new TypeSum);
-        PURES(TypeSum)(ts_dst)->sums.resize(PURES(TypeSum)(ts_src)->sums.size());
-        for (int i = 0; i < PURES(TypeSum)(ts_src)->sums.size(); ++i) {
-            deep_copy_from(PURES(TypeSum)(ts_dst)->sums[i], PURES(TypeSum)(ts_src)->sums[i]);
+        for (auto &e : PURES(TypeSum)(ts_src)->sums) {
+            TypeSignature tmp;
+            deep_copy_from(tmp, e);
+            PURES(TypeSum)(ts_dst)->sums.emplace_back(tmp);
         }
     } else if (MATCHS(TypeProduct)(ts_src)) {
         ts_dst = shared_ptr<TypeProduct>(new TypeProduct);

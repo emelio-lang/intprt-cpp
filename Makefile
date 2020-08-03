@@ -11,7 +11,9 @@ tkutil.o: Tokenizer/util.cpp
 	g++ -pg -std=c++2a -c $< -g3 -o $@
 tk.o: Tokenizer/tokenizer.cpp
 	g++ -pg -std=c++2a -c $< -g3 -o $@
-util.o: util.cpp emelio.h util.h
+util.o: util.cpp emelio-util.cpp emelio.h util.h
+	g++ -pg -std=c++2a -c $< -g3 -o $@
+emelio-util.o: emelio-util.cpp emelio.h util.h
 	g++ -pg -std=c++2a -c $< -g3 -o $@
 reduction.o: reduction.cpp.cc emelio.h util.h notation.h
 	g++ -pg --std=c++2a  -c $< -g3 -o $@
@@ -21,14 +23,18 @@ notation.o: notation.cpp emelio.h util.h notation.h
 	g++ -pg --std=c++2a  -c $< -g3 -o $@
 transpile.o: transpile.cpp emelio.h util.h notation.h
 	g++ -pg --std=c++2a  -c $< -g3 -o $@
-codegen.o: codegen.cpp emelio.h util.h notation.h codegen.h codegen*.cpp ocamlgen.cpp
+# codegen.o: codegen.cpp emelio.h util.h notation.h codegen.h codegen*.cpp ocamlgen.cpp
+# 	g++ -pg --std=c++2a  -c $< -g3 -o $@
+codegen.o: codegen.cpp emelio.h util.h notation.h codegen.h codegen6.cpp
+	g++ -pg --std=c++2a  -c $< -g3 -o $@
+type.o: type.cpp emelio.h util.h
 	g++ -pg --std=c++2a  -c $< -g3 -o $@
 emelio.o: emelio.cpp emelio.h util.h codegen.h
 	g++ -pg --std=c++2a  -c $< -g3 -o $@
 
 
-OBJS = tkutil.o tk.o util.o parse.o notation.o reduction.o codegen.o emelio.o 
-SML_OBJS = tkutil.o tk.o  util.o parse.o emelio.o
+OBJS = tkutil.o tk.o util.o emelio-util.o type.o parse.o notation.o codegen.o reduction.o emelio.o 
+SML_OBJS = tkutil.o tk.o  util.o emelio-util.o parse.o emelio.o
 
 compile: emelio
 	./emelio c test.em | gcc -lm -xc -Wall -o output -

@@ -27,12 +27,12 @@ const map<string, unsigned> bf2arity = {
 };
 
 const map<string, TypeSignature> bf2typesig = {
-    { "negate", TypeSignature { {"int"}, {"int"} }},
-    { "add", TypeSignature { {"int", "int"}, {"int"} }},
-    { "sub", TypeSignature { {"int", "int"}, {"int"} }},
-    { "mul", TypeSignature { {"int", "int"}, {"int"} }},
-    { "div", TypeSignature { {"int", "int"}, {"int"} }},
-    { "concat", TypeSignature { {"string", "string"}, {"string"} }},
+    { "negate", make_shared<TypeFn>( TypeFn { {"int"}, "int" } )},
+    { "add", make_shared<TypeFn>( TypeFn { {"int","int"}, "int" } )},
+    { "sub", make_shared<TypeFn>( TypeFn { {"int","int"}, "int" } )},
+    { "mul", make_shared<TypeFn>( TypeFn { {"int","int"}, "int" } )},
+    { "div", make_shared<TypeFn>( TypeFn { {"int","int"}, "int" } )},
+    { "concat", make_shared<TypeFn>( TypeFn { {"string","string"}, "string" } )},
 };
 
 #define CODEGEN_DELIMITER " "
@@ -235,9 +235,11 @@ void set_type::operator () (const shared_ptr<Code> c) {
         // 2 合致することを確かめます
         for (int i = 0; i < min(c->args.size(),c->l->argnames.size()); i++) {
             auto argname = c->l->argnames[i];
-            ASSERT(bind[argname].normalized() == c->args[i]->type.normalized(),
-                   ("引数"+argname+"の型が合致しません. (expected:" + bind[argname].normalized().to_string() +
-                    " inferred:"+c->args[i]->type.normalized().to_string()+")"));
+            auto a = normalized(bind[argname]);
+            auto b = normalized(c->args[i]->type);
+            ASSERT(a == b,
+                   ("引数"+argname+"の型が合致しません. (expected:" + to_string(a) +
+                    " inferred:"+to_string(b)+")"));
         }
 
 
@@ -245,61 +247,56 @@ void set_type::operator () (const shared_ptr<Code> c) {
         c->l->type = c->l->body->type;
         c->type = c->l->body->type;
         for (int i = 0; i < c->l->argtypes.size(); ++i) {
-            c->l->type.wrap(c->l->argtypes[i]);
-            c->type.wrap(c->l->argtypes[i]);
+            wrap(c->l->type, c->l->argtypes[i]);
+            wrap(c->type, c->l->argtypes[i]);
         }
-        c->type.apply(c->args.size());
+        apply(c->type, (int) c->args.size());
     }
     else if (c->lit.val == "fuse") {
         // TODO
+        
     }
     else if (c->lit.val == "type") {
-        TypeSignature tmp;
-        tmp.to = c->args[0]->lit.val;
-        tmp.normalize();
-        int i = 0;
-        for (auto typ : c->args[1]->l->argtypes) {
-            // NOTE: c->args[1]->lへの参照を使用しています！！
-            tmp.from.push_back(make_shared<TypeSignature>(typ));
+        // TypeSignature tmp;
+        // tmp.to = c->args[0]->lit.val;
+        // tmp.normalize();
+        // int i = 0;
+        // for (auto typ : c->args[1]->l->argtypes) {
+        //     // NOTE: c->args[1]->lへの参照を使用しています！！
+        //     tmp.from.push_back(make_shared<TypeSignature>(typ));
 
-            TypeSignature memfn;
-            memfn.from.push_back(tmp.to);
-            memfn.to = typ.to;
-            memfn.normalize();
-            bind[c->args[1]->l->argnames[i]] = memfn;
-            i++;
-        }
-        bind[c->args[0]->lit.val] = tmp;
+        //     TypeSignature memfn;
+        //     memfn.from.push_back(tmp.to);
+        //     memfn.to = typ.to;
+        //     memfn.normalize();
+        //     bind[c->args[1]->l->argnames[i]] = memfn;
+        //     i++;
+        // }
+        // bind[c->args[0]->lit.val] = tmp;
         
 //        type_constructors[c->args[0]->lit.val] = c->args[1]->l;
         this->operator()(c->args[2]);
     } else if (builtin_functions.contains(c->lit.val)) {
         for (auto a : c->args) (set_type(&bind))(a);
 
-        c->type.deep_copy_from(bf2typesig.at(c->lit.val));
-        c->type.apply(c->args.size());
+        deep_copy_from(c->type, bf2typesig.at(c->lit.val));
+        apply(c->type, (int) c->args.size());
 
         int i = 0;
         for (auto a : c->args) {
-            ASSERT(bf2typesig.at(c->lit.val).arg(i).normalized() == c->args[i]->type.normalized(),
-                   "'"+c->lit.val+"'の"+to_string(i)+"番目の引数の型が合致しません. (expected:" + bf2typesig.at(c->lit.val).to_string() +
-                   " inferred:"+c->args[i]->type.to_string()+")");
+            cout << 'a' << endl;
+            cout << to_string(arg(bf2typesig.at(c->lit.val),i)) << endl;
+            auto x = normalized(arg(bf2typesig.at(c->lit.val),i));
+            cout << 'a' << endl;
+            auto y = normalized(c->args[i]->type);
+            cout << 'a' << endl;
+            ASSERT(x == y,
+                   "'"+c->lit.val+"'の"+to_string(i)+"番目の引数の型が合致しません. (expected:" + to_string(bf2typesig.at(c->lit.val)) +
+                   " inferred:"+to_string(c->args[i]->type)+")");
         }
-    // } else if (type_constructors.contains(c->lit.val)) {
-    //     for (auto a : c->args) (set_type(&bind))(a);
-
-    //     c->type.deep_copy_from(bind[c->lit.val]);
-    //     c->type.apply(c->args.size());
-
-    //     int i = 0;
-    //     for (auto a : c->args) {
-    //         ASSERT(bind[c->lit.val].arg(i).normalized() == c->args[i]->type.normalized(),
-    //                "'"+c->lit.val+"'の"+to_string(i)+"番目の引数の型が合致しません. (expected:" + bind[c->lit.val].to_string() +
-    //                " inferred:"+c->args[i]->type.to_string()+")");
-    //     }
     } else if (is_literal(c->lit.val)) {
         if (is_number(c->lit.val)) {
-            c->type = TypeSignature("int");
+            c->type = "int";
         }
     } else {
         const auto fnname = c->lit.val;
@@ -308,14 +305,14 @@ void set_type::operator () (const shared_ptr<Code> c) {
         // もし、関数の型が分かっていないならとりまエラー
         ASSERT(bind.contains(fnname), "'"+fnname+"' の型が不明です");
 
-        c->type.deep_copy_from(bind[fnname]);
-        c->type.apply(c->args.size());
+        deep_copy_from(c->type, bind[fnname]);
+        apply(c->type, (int) c->args.size());
 
         int i = 0;
         for (auto a : c->args) {
-            ASSERT(bind[fnname].arg(i).normalized() == c->args[i]->type.normalized(),
-                   "'"+c->lit.val+"'の"+to_string(i)+"番目の引数の型が合致しません. (expected:" + bind[fnname].to_string() +
-                   " inferred:"+c->args[i]->type.to_string()+")");
+            ASSERT(normalized(arg(bind[fnname],i)) == normalized(c->args[i]->type),
+                   "'"+c->lit.val+"'の"+to_string(i)+"番目の引数の型が合致しません. (expected:" + to_string(bind[fnname]) +
+                   " inferred:"+to_string(c->args[i]->type)+")");
         }
     }
     cout << * c << endl;
@@ -323,13 +320,13 @@ void set_type::operator () (const shared_ptr<Code> c) {
 //    cout << "a" << endl;
 }
 
-#include "codegen1.cpp"
-#include "codegen2.cpp"
-#include "codegen3.cpp"
-#include "codegen4.cpp"
-#include "codegen5.cpp"
-#include "codegen6.cpp"
-#include "ocamlgen.cpp"
+// #include "codegen1.cpp"
+// #include "codegen2.cpp"
+// #include "codegen3.cpp"
+// #include "codegen4.cpp"
+// #include "codegen5.cpp"
+// #include "codegen6.cpp"
+// #include "ocamlgen.cpp"
 
 vector<string> split_instr(string instr) {
     vector<string> res;
