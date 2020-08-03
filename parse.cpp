@@ -175,7 +175,6 @@ TypeSignature type_signature(ParserFlow& p);
                     {- SKIP <> ":" -}
                     TypeSignature tmp;
                     {- MONAD <> tmp <> TypeSignature <> type_signature -}
-                    p.idx-=1;
                     l->argtypes.push_back(tmp);
                 } else {
                     p.idx++;
