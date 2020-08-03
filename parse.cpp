@@ -11,18 +11,19 @@
 
 #define NOW p.tknvals[p.idx]
 #define NEXT p.tknvals[p.idx+1]
+#define NEXT2 p.tknvals[p.idx+2]
 #define PASER(type, name)
 
 // {!MONAD <> e <> t <> u <> {const pair<#t, ParserFlow&> tmp1 = #u(p); #e = tmp1.first;    /*p = tmp1.second;*/}!}
 // {!MONAD_P <> e <> t <> u <> {const pair<#t, ParserFlow&> tmp1 = #u(p); #e = &tmp1.first; /*p = tmp1.second;*/}!}
 // {!MONAD_F <> e <> t <> u <> {const pair<#t, ParserFlow&> tmp1 = #u(p); #e(tmp1.first);   /*p = tmp1.second;*/}!}
-// {!SKIP <> s <> if (p.tknvals[p.idx] == #s) p.idx++; else cout << "Excepts " << #s << " but " << p.tknvals[p.idx] << endl; !}
+// {!SKIP <> s <> if (p.tknvals[p.idx] == #s) p.idx++; else cout << "Expects " << #s << " but " << p.tknvals[p.idx] << endl; !}
 // {!PARSE <> type <> name <> pair<#type, ParserFlow&> #name(ParserFlow& p) !}
 
 {!MONAD <> e <> t <> u <> {#e = #u(p);    /*p = tmp1.second;*/}!}
 {!MONAD_P <> e <> t <> u <> {#e = &#u(p); /*p = tmp1.second;*/}!}
 {!MONAD_F <> e <> t <> u <> {#e(#u(p));   /*p = tmp1.second;*/}!}
-{!SKIP <> s <> if (p.tknvals[p.idx] == #s) p.idx++; else cout << "Excepts " << #s << " but " << p.tknvals[p.idx] << endl; !}
+{!SKIP <> s <> if (p.tknvals[p.idx] == #s) p.idx++; else cout << "Expects " << #s << " but " << p.tknvals[p.idx] << endl; !}
 {!PARSE <> type <> name <> #type #name(ParserFlow& p) !}
 
 {- PARSE <> Literal <> literal -}
@@ -34,56 +35,119 @@
     return l;
 }
 
-// O - O - O -> O, (O), (O - O -> O)
+
+TypeSignature named_ts(ParserFlow& p);
+TypeSignature type_signature(ParserFlow& p);
+
+{- PARSE <> TypeSignature <> named_ts -}
+{
+    TypeSignature typesig =  make_shared<TypeProduct>(TypeProduct {});
+    while (true) {
+        PURES(TypeProduct)(typesig)->names.emplace_back(NOW);
+        p.idx++;
+        {- SKIP <> ":" -}
+        TypeSignature tmp;
+        {- MONAD <> tmp <> TypeSignature <> type_signature -}
+        PURES(TypeProduct)(typesig)->products.emplace_back(tmp);
+        if (NOW == ")") {
+            return typesig;
+        }
+    }
+}
+
+// TODO: 関数分けてみても良いかも
+// TypeSignature 種類
+// And = Ty Ty Ty ...
+// Or  = Ty | Ty | Ty ...
+// Fn  = Ty - Ty - Ty -> Ty
+// Ty  = ( Ty )
+// Ty  = name1:Ty name2:Ty ...
+// Ty  = String [ Ty ... ]
+// Ty  = String
 {- PARSE <> TypeSignature <> type_signature -}
 {
     TypeSignature typesig;
-    if (NOW == "(") {
-        {- SKIP <> "(" -}
-    }
+    enum { PRODUCT, SUM, FUNCTION, ATOM, PATOM } type;
 
-    while (NOW != ">") {
-        if (NOW == "(") {
-            TypeSignature tmp;
-            {- MONAD <> tmp <> TypeSignature <> type_signature -}
-            typesig.from.push_back(make_shared<TypeSignature>(tmp));
-        } else {
-            typesig.from.push_back(NOW);
-            p.idx++;
-        }
-
-        // NOTE: ->があるかどうかでココの内容をfromに入れてよいかが決まるが、それは今はわからないので
-        // NOW が)だったり、とにかく-でない場合はそこで終了、関数型でないとみなしto = fromする
-        if (NOW != "-") {
-            if (NOW == ")") {
-                {- SKIP <> ")" -}
-            }
-            typesig = TypeSignature(typesig.from);
-            typesig.from = {};
-            return typesig;
-        }
-
-        {- SKIP <> "-" -}
-    }
-
-    {- SKIP <> ">" -}
-
-    if (NOW == "(") {
+    if (NEXT == ":") {
         TypeSignature tmp;
-        {- MONAD <> tmp <> TypeSignature <> type_signature -}
-        typesig.to = make_shared<TypeSignature>(tmp);
-    } else {
-        typesig.to = NOW;
-        p.idx++;
+        {- MONAD <> tmp <> TypeSignature <> named_ts -}
+        return tmp;
     }
-
-    if (NOW == ")") {
-        {- SKIP <> ")" -}
+    
+    if (NOW == "(") {
+        type = PATOM;
+        p.idx++;
+    } else {
+        typesig = NOW;
+        p.idx++;
         return typesig;
     }
 
+    {
+        TypeSignature tmp;
+        {- MONAD <> tmp <> TypeSignature <> type_signature -}
+        if (NOW == ")" && type==PATOM) {
+            {- SKIP <> ")" -}
+            return tmp;
+        } else if (NOW == ")") {
+            // type == ATOM
+            {- SKIP <> ")" -}
+            return tmp;
+        } else if (NOW == "|") {
+            type = SUM;
+            typesig = make_shared<TypeSum>(TypeSum { {tmp} });
+            p.idx++;
+        } else if (NOW == "-") {
+            type = FUNCTION;
+            typesig = make_shared<TypeFn>(TypeFn { {tmp} });
+            p.idx++;
+        } else {
+            type = PRODUCT;
+            typesig = make_shared<TypeProduct>(TypeProduct { {tmp} });
+        }
+    }
+    
+    while (true) {
+        TypeSignature tmp;
 
-    return typesig;
+        bool type_fn_to = false;
+        if (type==FUNCTION && NOW==">") {
+            type_fn_to = true;
+            p.idx++;
+        }
+        
+        {- MONAD <> tmp <> TypeSignature <> type_signature -}
+        switch (type) {
+            case SUM:
+                 PURES(TypeSum)(typesig)->add_type(tmp);
+                break;
+            case PRODUCT: PURES(TypeProduct)(typesig)->products.push_back(tmp);break;
+            case FUNCTION:
+                if (type_fn_to) {
+                    PURES(TypeFn)(typesig)->to = tmp;
+                    p.idx++;
+                    return typesig;
+                } else {
+                    PURES(TypeFn)(typesig)->from.push_back(tmp);
+                }
+                break;
+        }
+        
+        if (NOW == ")") {
+            {- SKIP <> ")" -}
+            return typesig;
+        }
+        
+        switch (type) {
+            case SUM:
+            {- SKIP <> "|" -}
+            break;
+            case FUNCTION:
+            {- SKIP <> "-" -}
+            break;
+        }
+    }
 }
 
 
@@ -111,6 +175,7 @@
                     {- SKIP <> ":" -}
                     TypeSignature tmp;
                     {- MONAD <> tmp <> TypeSignature <> type_signature -}
+                    p.idx-=1;
                     l->argtypes.push_back(tmp);
                 } else {
                     p.idx++;
@@ -183,6 +248,17 @@
         while (p.idx < p.tknvals.size()) {
             if (NOW == ")" || NOW == "") {
                 break;
+            }
+            // TODO: Codeの最初に型表記がある場合は...
+            if (NOW == ":") {
+                {- SKIP <> ":" -}
+                
+                TypeSignature tmp;
+                shared_ptr<Code> newcode = shared_ptr<Code>(new Code);
+                {- MONAD <> tmp <> TypeSignature <> type_signature -}
+                newcode->rawtype = tmp;
+                c->args.emplace_back(newcode);
+                continue;
             }
 
             {- MONAD_F <> c->args.emplace_back <> shared_ptr<Code> <> argument -}
