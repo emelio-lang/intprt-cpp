@@ -30,13 +30,16 @@ void apply(TypeSignature &typesig, const int _n) {
 }
 
 void wrap(TypeSignature &typesig, const TypeSignature &wrp) {
+    TypeSignature ts;
+    deep_copy_from(ts, wrp);
+//    cout << to_string(typesig) << " " << to_string(wrp) << endl;
     if (MATCHS(TypeFn)(typesig)) {
         auto fn = PURES(TypeFn)(typesig);
-        fn->from.push_front(wrp);
+        fn->from.push_front(ts);
     } else {
         TypeSignature newts = shared_ptr<TypeFn>(new TypeFn);
         auto newfn = PURES(TypeFn)(newts);
-        newfn->from.push_back(wrp);
+        newfn->from.push_back(ts);
         deep_copy_from(newfn->to, typesig);
         typesig = newts;
     }
@@ -196,12 +199,26 @@ TypeSignature normalized(const TypeSignature &typesig) {
     return res;
 }
 
+bool verify(const TypeSignature &ts1, const TypeSignature &ts2) {
+    if (ts1 == ts2) return true;
+
+    if (MATCHS(TypeSum)(ts1)) {
+        unordered_set<TypeSignature> a(PURES(TypeSum)(ts1)->sums.begin(), PURES(TypeSum)(ts1)->sums.end());
+        if (a.contains(ts2)) return true;
+    }
+    return false;
+}
+
 bool equal(const TypeSignature &ts1, const TypeSignature &ts2) {
     bool res = true;
     if (MATCHS(TypeFn)(ts1) && MATCHS(TypeFn)(ts2)) {
+        cout << to_string(ts1) << " " << to_string(ts2) << endl;
         res = res && equal(PURES(TypeFn)(ts1)->to, PURES(TypeFn)(ts2)->to);
+        cout << res << endl;
         res = res && PURES(TypeFn)(ts1)->from.size() == PURES(TypeFn)(ts2)->from.size();
+        cout << res << endl;
         for (int i = 0; i < PURES(TypeFn)(ts1)->from.size(); ++i) {
+            cout << res << endl;
             res = res && equal(PURES(TypeFn)(ts1)->from[i], PURES(TypeFn)(ts2)->from[i]);
         }
         return res;
@@ -218,6 +235,7 @@ bool equal(const TypeSignature &ts1, const TypeSignature &ts2) {
         return PURE(string)(ts1) == PURE(string)(ts2);
     } else return false;
 }
+bool operator==(const TypeSignature &ts1, const TypeSignature &ts2) { return equal(ts1, ts2); }
 
 void deep_copy_from(TypeSignature &ts_dst, const TypeSignature &ts_src) {
     if (MATCHS(TypeFn)(ts_src)) {
@@ -276,6 +294,16 @@ string to_string(const TypeSignature &typesig) {
     }
     return ss.str();
 }
+
+bool is_functional(const TypeSignature &ts) {
+    return MATCHS(TypeFn)(ts);
+}
+
+bool arity(const TypeSignature &ts) {
+    if (MATCHS(TypeFn)(ts)) return PURES(TypeFn)(ts)->from.size();
+    else return 0;
+}
+
 
 
 // TypeSignature TypeSignature::outcome() const {

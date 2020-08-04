@@ -65,20 +65,23 @@ int main(int argc, char **argv) {
         ParserFlow pf = {tkn.tokenvals, 0};
 
         shared_ptr<Code> root = code(pf);
-        cout << *root << endl;
         // set_type()(root);
         // cout << *root << endl;
         
-        // extract_all_notations(root, true);
-        // cout << *root << endl;
-        // rename_variables(root);
+        extract_all_notations(root, true);
+        cout << *root << endl;
+        rename_variables(root);
 //        set_arity()(root);
-//        set_type()(root);
+        set_type()(root);
+       
+        cout << *root << endl;
 
-//        cout << *root << endl;
-
+        cout << 'a' << endl;
 //        cout << transpile(root, "c");
-//        cout << codegen(root);
+        Compiled result;
+        result = ocamlgen()(root);
+
+        cout << result.env << result.body << ";;";
 //        cout << "prepare name hash:\n";
 //        Compiled result;
 //        result = codegen6()(root);

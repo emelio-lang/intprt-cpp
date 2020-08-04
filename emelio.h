@@ -83,6 +83,10 @@ struct TypeFn {
     TypeSignature to;
 };
 bool equal(const TypeSignature &ts1, const TypeSignature &ts2);
+bool verify(const TypeSignature &ts1, const TypeSignature &ts2);
+bool is_functional(const TypeSignature &ts1);
+bool arity(const TypeSignature &ts);
+bool operator==(const TypeSignature &ts1, const TypeSignature &ts2);
 void deep_copy_from(TypeSignature &ts_dst, const TypeSignature &ts_src);
 string to_string(const TypeSignature &typesig);
 void _normalize(TypeSignature &typesig);

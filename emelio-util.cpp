@@ -126,7 +126,7 @@ ostream& operator<<(ostream& stream, Lambda *l) {
 }
 
 ostream& operator<<(ostream& stream, const Code& c) {
-    stream << c.arity;
+//    stream << c.arity;
     
     if (c.l) {
         stream << *c.l;

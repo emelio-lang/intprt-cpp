@@ -237,28 +237,47 @@ void set_type::operator () (const shared_ptr<Code> c) {
             auto argname = c->l->argnames[i];
             auto a = normalized(bind[argname]);
             auto b = normalized(c->args[i]->type);
-            ASSERT(a == b,
+            ASSERT(verify(a, b),
                    ("引数"+argname+"の型が合致しません. (expected:" + to_string(a) +
                     " inferred:"+to_string(b)+")"));
         }
 
 
         // 4
-        c->l->type = c->l->body->type;
-        c->type = c->l->body->type;
+        deep_copy_from(c->l->type, c->l->body->type);
+        deep_copy_from(c->type, c->l->body->type);
+        // cout << to_string(c->type) << endl;
+        // cout << "wrap " << c->l->argtypes.size() << endl;
         for (int i = 0; i < c->l->argtypes.size(); ++i) {
             wrap(c->l->type, c->l->argtypes[i]);
             wrap(c->type, c->l->argtypes[i]);
         }
+        // cout << "apply " << c->args.size() << endl;
         apply(c->type, (int) c->args.size());
     }
     else if (c->lit.val == "fuse") {
+        c->type = shared_ptr<TypeSum>(new TypeSum);
         // TODO
+        for (int i = c->args.size()-1; i >= 0; i--) {
+            (set_type(&bind))(c->args[i]);
+            // argstack.push(c->args[i]);
+            PURES(TypeSum)(c->type)->add_type(c->args[i]->type);
+        }
+
+        if (PURES(TypeSum)(c->type)->sums.size() == 1)
+            c->type = c->args[0]->type;
+
         
     }
     else if (c->lit.val == "type") {
-        // TypeSignature tmp;
-        // tmp.to = c->args[0]->lit.val;
+        shared_ptr<TypeFn> new_type_fn = shared_ptr<TypeFn>(new TypeFn);
+        new_type_fn->to = c->args[0]->lit.val;
+        for (auto typ : PURES(TypeProduct)(c->args[1]->rawtype)->products) {
+            new_type_fn->from.emplace_back(typ);
+        }
+        bind[c->args[0]->lit.val] = new_type_fn;
+        cout << c->args[0]->lit.val << " " << to_string(bind[c->args[0]->lit.val]) << endl;
+
         // tmp.normalize();
         // int i = 0;
         // for (auto typ : c->args[1]->l->argtypes) {
@@ -272,7 +291,6 @@ void set_type::operator () (const shared_ptr<Code> c) {
         //     bind[c->args[1]->l->argnames[i]] = memfn;
         //     i++;
         // }
-        // bind[c->args[0]->lit.val] = tmp;
         
 //        type_constructors[c->args[0]->lit.val] = c->args[1]->l;
         this->operator()(c->args[2]);
@@ -290,7 +308,7 @@ void set_type::operator () (const shared_ptr<Code> c) {
             cout << 'a' << endl;
             auto y = normalized(c->args[i]->type);
             cout << 'a' << endl;
-            ASSERT(x == y,
+            ASSERT(verify(x, y),
                    "'"+c->lit.val+"'の"+to_string(i)+"番目の引数の型が合致しません. (expected:" + to_string(bf2typesig.at(c->lit.val)) +
                    " inferred:"+to_string(c->args[i]->type)+")");
         }
@@ -310,7 +328,7 @@ void set_type::operator () (const shared_ptr<Code> c) {
 
         int i = 0;
         for (auto a : c->args) {
-            ASSERT(normalized(arg(bind[fnname],i)) == normalized(c->args[i]->type),
+            ASSERT(verify(normalized(arg(bind[fnname],i)), normalized(c->args[i]->type)),
                    "'"+c->lit.val+"'の"+to_string(i)+"番目の引数の型が合致しません. (expected:" + to_string(bind[fnname]) +
                    " inferred:"+to_string(c->args[i]->type)+")");
         }
@@ -326,7 +344,7 @@ void set_type::operator () (const shared_ptr<Code> c) {
 // #include "codegen4.cpp"
 // #include "codegen5.cpp"
 // #include "codegen6.cpp"
-// #include "ocamlgen.cpp"
+#include "ocamlgen.cpp"
 
 vector<string> split_instr(string instr) {
     vector<string> res;

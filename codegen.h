@@ -234,10 +234,19 @@ public:
 
 class ocamlgen {
 private:
+    stack<shared_ptr<Code>> argstack;
+    static map<string, TypeSignature> type_binds; // TODO: スコープいいの？
+
 public:
     ocamlgen() {}
     ~ocamlgen() {}
-    string operator () (const shared_ptr<Code> c);
+    Compiled operator () (const shared_ptr<Code> &c);
+    string print_type_from(const deque<TypeSignature> &tys, const shared_ptr<Lambda> &lam);
+    string print_def(string name, const shared_ptr<Code>& code);
+    // v.main <+ v.env
+    string compress(const Compiled &&v);
+    // a += b
+    void paircat(Compiled &a, const Compiled &&b);
 };
 
 // pair<string,string> codegen(CodegenFlow);
