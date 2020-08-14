@@ -134,6 +134,19 @@ std::string random_saneupper_string( size_t length )
     return str;
 }
 
+char asciitolower(char in) {
+    if (in <= 'Z' && in >= 'A')
+        return in - ('Z' - 'z');
+    return in;
+}
+
+std::string tolower(std::string data) {
+    std::string res = data;
+    std::transform(res.begin(), res.end(), res.begin(), asciitolower);
+    return res;
+}
+
+
 bool is_all_upper(string &s) {
     return accumulate(s.begin(), s.end(), true, [](bool acc, char i) {
                                                     return acc && isupper(i);

@@ -12,11 +12,11 @@
 
 enum GuardType { GTYPE_COUNTABLE_FINITE, GTYPE_FINITE };
 struct Guard {
-    vector<pair<string, shared_ptr<Code>>> finites;
+    deque<pair<string, shared_ptr<Code>>> finites;
     shared_ptr<Code> countable;
 };
-Guard get_guard(const vector<shared_ptr<Code>> &args);
-GuardType get_guard_type(const vector<shared_ptr<Code>> &args);
+Guard get_guard(const deque<shared_ptr<Code>> &args);
+GuardType get_guard_type(const deque<shared_ptr<Code>> &args);
 
 
 class set_arity {
@@ -29,6 +29,18 @@ public:
         if (pb) bind = *pb;
     }
     ~set_arity() {
+    }
+    void operator () (const shared_ptr<Code> c);
+};
+
+class set_fv {
+private:
+    stack<shared_ptr<Code>> varstack;
+public:
+    set_fv(stack<shared_ptr<Code>> *pa = nullptr) {
+        if (pa) varstack = *pa;
+    }
+    ~set_fv() {
     }
     void operator () (const shared_ptr<Code> c);
 };
@@ -235,7 +247,7 @@ public:
 class ocamlgen {
 private:
     stack<shared_ptr<Code>> argstack;
-    static map<string, TypeSignature> type_binds; // TODO: スコープいいの？
+    static map<string, TypeSignature> data_bind; // TODO: スコープいいの？
 
 public:
     ocamlgen() {}
@@ -243,6 +255,8 @@ public:
     Compiled operator () (const shared_ptr<Code> &c);
     string print_type_from(const deque<TypeSignature> &tys, const shared_ptr<Lambda> &lam);
     string print_def(string name, const shared_ptr<Code>& code);
+    string print_data_structure(const TypeSignature type);
+    string ocaml_type_name(string s);
     // v.main <+ v.env
     string compress(const Compiled &&v);
     // a += b

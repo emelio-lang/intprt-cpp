@@ -1,3 +1,1 @@
-(type Point :(x:int y:int) (
-      Point 3 2
-))
+(|foo:(int->int)| foo 3) (fuse (|x:int| x) (|1:int| 0))

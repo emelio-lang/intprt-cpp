@@ -163,6 +163,7 @@ struct Lambda {
 
     TypeSignature type;
 
+    vector<string> freevars {};
 
 //    vector<shared_ptr<Lambda>> fused;
 

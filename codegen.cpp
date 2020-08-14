@@ -56,7 +56,7 @@ string StaticProgram = "";
 unsigned function_call_counter = 0;
 unsigned conditional_counter = 0;
 
-Guard get_guard(const vector<shared_ptr<Code>> &args) {
+Guard get_guard(const deque<shared_ptr<Code>> &args) {
     Guard res;
     for (auto arg : args) {
         if (is_literal(arg->l->argnames[0])) {
@@ -68,7 +68,7 @@ Guard get_guard(const vector<shared_ptr<Code>> &args) {
     return res;
 }
 
-GuardType get_guard_type(const vector<shared_ptr<Code>> &args) {
+GuardType get_guard_type(const deque<shared_ptr<Code>> &args) {
     for (auto arg : args) {
         if (!is_literal(arg->l->argnames[0])) {
             return GTYPE_COUNTABLE_FINITE;
@@ -144,6 +144,18 @@ void SCOUT(deque<shared_ptr<T>> s) {
     }
     cout << endl;
 }
+
+void set_fv::operator () (const shared_ptr<Code> c) {
+    // if (c->l) {
+    //     set_fv()(c->l->body);
+    //     c->l->freevars = c->l->body->l ? c->l->body->l->freevars
+    //     for (auto arg : c->args) {
+    //         c->l->
+    //     }
+    // } else {
+    // }
+}
+
 
 void set_arity::operator () (const shared_ptr<Code> c) {
     if (c->l) {
@@ -266,8 +278,6 @@ void set_type::operator () (const shared_ptr<Code> c) {
 
         if (PURES(TypeSum)(c->type)->sums.size() == 1)
             c->type = c->args[0]->type;
-
-        
     }
     else if (c->lit.val == "type") {
         shared_ptr<TypeFn> new_type_fn = shared_ptr<TypeFn>(new TypeFn);

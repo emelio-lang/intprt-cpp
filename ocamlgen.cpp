@@ -1,4 +1,7 @@
-map<string, TypeSignature> ocamlgen::type_binds; // TODO: スコープいいの？
+map<string, TypeSignature> ocamlgen::data_bind; // TODO: スコープいいの？
+
+// TODO: 名前をつける関数のトップレベルに引数が全てない場合ダメになる
+// (|foo| ...) ((|a b| ...))みたいなやつとか
 
 string
 ocamlgen::compress(const Compiled &&v) {
@@ -8,6 +11,25 @@ void
 ocamlgen::paircat(Compiled &x, const Compiled &&v) {
     x.body += v.body;
     x.env += v.env;
+}
+
+string
+ocamlgen::ocaml_type_name(string s) {
+    return "t_" + tolower(s);
+}
+
+string
+ocamlgen::print_data_structure(const TypeSignature type) {
+    string res = "";
+    cout << "heyyy" << endl;
+    cout << to_string(type) << endl;
+    if (MATCHS(TypeProduct)(type)) {
+        auto prod = PURES(TypeProduct)(type);
+        for (int i = 0; i < prod->names.size(); i++) {
+            res += prod->names[i] + " : " + to_string(prod->products[i]) + "; ";
+        }
+    }
+    return res;
 }
 
 
@@ -26,7 +48,7 @@ ocamlgen::print_def(string name, const shared_ptr<Code>& code) {
     string res = "";
     if (is_functional(code->type)) {
         // c->argsはとりあえず無視して、ここの引数は出力しないようにしてみる
-        res += "let " + name + " " + print_type_from(PURES(TypeFn)(code->type)->from, code->l) + " = \n";
+        res += "let " + name + " " + print_type_from(PURES(TypeFn)(code->type)->from, code->l) + " = ";
         cout << res << endl;
         Compiled v1 = ocamlgen()(code->l->body);
         res += v1.env + v1.body + " in\n";
@@ -46,19 +68,53 @@ ocamlgen::operator () (const shared_ptr<Code> &c) {
         assert(c->args.size() == 0);
         return Compiled { c->lit.val, "" };
     } else if (c->lit.val == "type") {
-        type_binds[c->args[1]->lit.val]= c->args[2]->rawtype;
+        data_bind[c->args[0]->lit.val] = c->args[1]->rawtype;
         // type_constructors[c->args[0]->lit.val] = c->args[1]->l;
         // data_bind[c->args[0]->lit.val] = parse_data_structure(c->args[1]->l->body);
         // cout << to_string(data_bind[c->args[0]->lit.val]) << endl;
 
         Compiled res;
-        // res.env += "struct " + c->args[0]->lit.val + "{\n";
-        // res.env += print_data_structure(data_bind[c->args[0]->lit.val]);
-        // res.env += "};\n";
+        res.env += "type " + ocaml_type_name(c->args[0]->lit.val) + " = { ";
+        res.env += print_data_structure(c->args[1]->rawtype);
+        res.env += "};;\n";
 
         Compiled v1 = operator()(c->args[2]);
         res.env += v1.env;
         res.body += v1.body;
+        return res;
+    } else if (c->lit.val == "fuse") {
+        Compiled res;
+        Guard guard = get_guard(c->args);
+        GuardType gtype = get_guard_type(c->args);
+
+        switch (gtype) {
+            case GTYPE_COUNTABLE_FINITE: {
+                const unsigned fnidx = function_call_counter++;
+                int i = 0;
+                string matchlist = "";
+                for (auto a : guard.countable->l->argnames) {
+                    matchlist += a;
+                    if (i == guard.countable->l->argnames.size()) {
+                        matchlist += ", ";
+                    }
+                    i++;
+                }
+
+                res.body += "(fun " + matchlist + " -> match " + matchlist + " with\n";
+                
+                for (auto p : guard.finites) {
+                    Compiled v1 = operator()(p.second);
+                    res.body += "| " + p.first + " -> " + v1.body + "\n";
+                }
+
+                Compiled v1 = operator()(guard.countable->l->body);
+                res.body += "| " + matchlist + " -> " + v1.body + "\n";
+                res.body += ")\n";
+            } break;
+
+            case GTYPE_FINITE: {
+            } break;
+        }
         return res;
     } else if (builtin_functions.contains(c->lit.val)) {
         Compiled res;
@@ -137,15 +193,31 @@ ocamlgen::operator () (const shared_ptr<Code> &c) {
         //     res.body += "__pseudo_"+to_string(pfcounter)+"()";
         //     pseudo_func_counter++;
         // } else {
-        res.body += c->lit.val;
-        while (!argstack.empty()) {
-            Compiled tmp = ocamlgen()(argstack.top());
+        if (data_bind.contains(c->lit.val)) {
+            int i = 0;
+            auto records = PURES(TypeProduct)(data_bind[c->lit.val]);
+            res.body += "{";
+            while (!argstack.empty()) {
+                Compiled tmp = ocamlgen()(argstack.top());
 
-            argstack.pop();
-            res.body += " ";
-            res.env += tmp.env;
-            res.body += "(" + tmp.body + ")";
-            // }
+                argstack.pop();
+                res.body += " ";
+//                res.env += tmp.env;
+                res.body += records->names[i]+"="+tmp.body+"; ";
+                i++;
+            }
+            res.body += "}";
+        } else {
+            res.body += c->lit.val;
+            while (!argstack.empty()) {
+                Compiled tmp = ocamlgen()(argstack.top());
+
+                argstack.pop();
+                res.body += " ";
+                res.env += tmp.env;
+                res.body += "(" + tmp.body + ")";
+                // }
+            }
         }
         return res;
     }
