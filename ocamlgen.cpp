@@ -67,6 +67,9 @@ ocamlgen::operator () (const shared_ptr<Code> &c) {
     if (is_literal(c->lit.val)) {
         assert(c->args.size() == 0);
         return Compiled { c->lit.val, "" };
+    } else if (c->lit.val == "_get") {
+        Compiled tmp = ocamlgen()(c->args[0]);
+        return Compiled { "("+tmp.env+tmp.body+")"+"."+c->args[1]->lit.val, "" };
     } else if (c->lit.val == "type") {
         data_bind[c->args[0]->lit.val] = c->args[1]->rawtype;
         // type_constructors[c->args[0]->lit.val] = c->args[1]->l;
@@ -77,6 +80,13 @@ ocamlgen::operator () (const shared_ptr<Code> &c) {
         res.env += "type " + ocaml_type_name(c->args[0]->lit.val) + " = { ";
         res.env += print_data_structure(c->args[1]->rawtype);
         res.env += "};;\n";
+
+        // if (MATCHS(TypeProduct)(c->args[1]->rawtype)) {
+        //     auto &product = PURES(TypeProduct)(c->args[1]->rawtype);
+        //     for (int i = 0; i < product->products.size(); i++) {
+        //         res.env += "let "+product->names[i]+" = "
+        //     }
+        // }
 
         Compiled v1 = operator()(c->args[2]);
         res.env += v1.env;
@@ -103,6 +113,7 @@ ocamlgen::operator () (const shared_ptr<Code> &c) {
                 res.body += "(fun " + matchlist + " -> match " + matchlist + " with\n";
                 
                 for (auto p : guard.finites) {
+                    cout << p.first << " = " << *p.second << endl;
                     Compiled v1 = operator()(p.second);
                     res.body += "| " + p.first + " -> " + v1.body + "\n";
                 }

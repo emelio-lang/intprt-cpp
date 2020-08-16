@@ -5,7 +5,8 @@
 
 int main(int argc, char **argv) {
     Tokenizer tkn;
-    tkn.set("specials", "!#$%&()-^\\@[;:],./=~|{+*}<>?");
+    // メンバアクセスのために.をなくした
+    tkn.set("specials", "!#$%&()-^\\@[;:],/=~|{+*}<>?.");
     tkn.set("escaper", "\"'`");
     tkn.set("ignores", "");
     tkn.set("ignoresplit", " \t\n");

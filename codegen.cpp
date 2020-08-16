@@ -13,6 +13,8 @@
 
 #include <sstream>
 
+map<string, TypeSignature> set_type::data_bind;
+
 const set<string> builtin_functions = {
     "add", "sub", "mul", "div", "negate", "concat", "fuse"
 };
@@ -33,6 +35,7 @@ const map<string, TypeSignature> bf2typesig = {
     { "mul", make_shared<TypeFn>( TypeFn { {"int","int"}, "int" } )},
     { "div", make_shared<TypeFn>( TypeFn { {"int","int"}, "int" } )},
     { "concat", make_shared<TypeFn>( TypeFn { {"string","string"}, "string" } )},
+    { "_get", make_shared<TypeFn>( TypeFn { {"any"}, "any" } )},
 };
 
 #define CODEGEN_DELIMITER " "
@@ -254,7 +257,6 @@ void set_type::operator () (const shared_ptr<Code> c) {
                     " inferred:"+to_string(b)+")"));
         }
 
-
         // 4
         deep_copy_from(c->l->type, c->l->body->type);
         deep_copy_from(c->type, c->l->body->type);
@@ -266,6 +268,32 @@ void set_type::operator () (const shared_ptr<Code> c) {
         }
         // cout << "apply " << c->args.size() << endl;
         apply(c->type, (int) c->args.size());
+    }
+    else if (c->lit.val == "_get") {
+        (set_type(&bind))(c->args[0]);
+        auto type_name = PURE(string)(c->args[0]->type);
+        if (MATCHS(TypeProduct)(data_bind[type_name])) {
+            auto &records = PURES(TypeProduct)(data_bind[type_name]);
+            string varname = "";
+            {
+                auto &pivot = c->args[1];
+                while (pivot->l) { pivot = pivot->l->body; }
+                varname = pivot->lit.val;
+            }
+            auto &fruit = records->products[distance(records->names.begin(), find(records->names.begin(), records->names.end(), varname))];
+            deep_copy_from(c->type, fruit);
+
+            // shared_ptr<TypeFn> newfn(new TypeFn);
+            // deep_copy_from(newfn->to, fruit);
+            // {
+            //     TypeSignature tmp;
+            //     deep_copy_from(tmp, type_name);
+            //     newfn->from.emplace_back(tmp);
+            // }
+//            c->type = fruit;
+        } else {
+            assert("TODO: あとで！");
+        }
     }
     else if (c->lit.val == "fuse") {
         c->type = shared_ptr<TypeSum>(new TypeSum);
@@ -286,6 +314,7 @@ void set_type::operator () (const shared_ptr<Code> c) {
             new_type_fn->from.emplace_back(typ);
         }
         bind[c->args[0]->lit.val] = new_type_fn;
+        data_bind[c->args[0]->lit.val] = c->args[1]->rawtype;
         cout << c->args[0]->lit.val << " " << to_string(bind[c->args[0]->lit.val]) << endl;
 
         // tmp.normalize();

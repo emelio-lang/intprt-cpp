@@ -48,6 +48,7 @@ public:
 class set_type {
 private:
     map<string, TypeSignature> bind;
+    static map<string, TypeSignature> data_bind;
     map<string, shared_ptr<Lambda>> type_constructors;
     stack<shared_ptr<Code>> argstack;
 public:

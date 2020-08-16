@@ -205,6 +205,8 @@ bool verify(const TypeSignature &ts1, const TypeSignature &ts2) {
     if (MATCHS(TypeSum)(ts1)) {
         unordered_set<TypeSignature> a(PURES(TypeSum)(ts1)->sums.begin(), PURES(TypeSum)(ts1)->sums.end());
         if (a.contains(ts2)) return true;
+    } else if ((MATCH(string)(ts1) && PURE(string)(ts1) == "any") || (MATCH(string)(ts2) && PURE(string)(ts2) == "any")) {
+        return true;
     }
     return false;
 }

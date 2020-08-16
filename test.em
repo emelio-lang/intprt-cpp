@@ -1,1 +1,5 @@
-(|foo:(int->int)| foo 3) (fuse (|x:int| x) (|1:int| 0))
+(type Point :(x:int y:int) (
+(gnotation (As . Bs) (_get As Bs) (
+      (Point 100 200).x
+))
+))
