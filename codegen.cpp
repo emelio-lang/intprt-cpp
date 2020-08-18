@@ -65,7 +65,7 @@ Guard get_guard(const deque<shared_ptr<Code>> &args) {
         if (is_literal(arg->l->argnames[0])) {
             res.finites.push_back(make_pair(arg->l->argnames[0], arg->l->body));
         } else {
-            res.countable = arg;
+            res.countables.emplace_back(arg);
         }
     }
     return res;

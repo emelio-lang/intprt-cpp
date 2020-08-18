@@ -13,7 +13,7 @@
 enum GuardType { GTYPE_COUNTABLE_FINITE, GTYPE_FINITE };
 struct Guard {
     deque<pair<string, shared_ptr<Code>>> finites;
-    shared_ptr<Code> countable;
+    deque<shared_ptr<Code>> countables;
 };
 Guard get_guard(const deque<shared_ptr<Code>> &args);
 GuardType get_guard_type(const deque<shared_ptr<Code>> &args);

@@ -99,27 +99,49 @@ ocamlgen::operator () (const shared_ptr<Code> &c) {
 
         switch (gtype) {
             case GTYPE_COUNTABLE_FINITE: {
+                // TODO: finiteとcountableが混ざったやつはどう処理されるんだろう
                 const unsigned fnidx = function_call_counter++;
-                int i = 0;
-                string matchlist = "";
-                for (auto a : guard.countable->l->argnames) {
-                    matchlist += a;
-                    if (i == guard.countable->l->argnames.size()) {
-                        matchlist += ", ";
+                {
+                    // NOTE: 仮のmatchlist (fun *** -> match *** withの***の部分を埋めるだけの変数名をcountable[0]から取って作る
+                    int i = 0;
+                    string matchlist = "";
+                    for (auto a : guard.countables[0]->l->argnames) {
+                        matchlist += a;
+                        if (i == guard.countables[0]->l->argnames.size()) {
+                            matchlist += ", ";
+                        }
+                        i++;
                     }
-                    i++;
+
+                    res.body += "(fun " + matchlist + " -> match " + matchlist + " with\n";
                 }
 
-                res.body += "(fun " + matchlist + " -> match " + matchlist + " with\n";
-                
+                // NOTE: 有限定義域の関数を出力
                 for (auto p : guard.finites) {
                     cout << p.first << " = " << *p.second << endl;
                     Compiled v1 = operator()(p.second);
                     res.body += "| " + p.first + " -> " + v1.body + "\n";
                 }
 
-                Compiled v1 = operator()(guard.countable->l->body);
-                res.body += "| " + matchlist + " -> " + v1.body + "\n";
+                // 無限定義域の関数を出力（型が異なれば別々に）
+                for (auto c : guard.countables) {
+                    int i = 0;
+                    string matchlist = "";
+                    for (int j = 0; j < c->l->argnames.size(); j++) {
+                        assert(MATCH(string)(PURES(TypeFn)(c->type)->from[j]));
+                        const string name = c->l->argnames[j];
+                        const string type = PURE(string)(PURES(TypeFn)(c->type)->from[j]);
+                        
+                        matchlist += type + " " + name;
+                        if (i == c->l->argnames.size()) {
+                            matchlist += ", ";
+                        }
+                        i++;
+                    }
+
+                    Compiled v1 = operator()(c->l->body);
+                    res.body += "| " + matchlist + " -> " + v1.body + "\n";
+                }
                 res.body += ")\n";
             } break;
 
