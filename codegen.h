@@ -245,6 +245,35 @@ public:
     void paircat(Compiled &a, const Compiled &&b);
 };
 
+class codegen7 {
+private:
+    stack<shared_ptr<Code>> argstack;
+    stack<shared_ptr<Code>> dummy_argstack;
+    static map<string, TypeSignature> data_bind; // TODO: スコープいいの？
+    
+    // TODO hashを作ってunordered_map<TypeSignature, string>に作った型情報を保存して使い回すようにする
+    unordered_map<TypeSignature, string> tmptypes;
+    static unsigned int type_count;
+    static unsigned int dummy_count;
+
+public:
+    codegen7(stack<shared_ptr<Code>> init_argstack) { argstack = init_argstack; }
+    codegen7() {}
+    ~codegen7() {}
+    Compiled operator () (const shared_ptr<Code> &c);
+    string print_def(string name, const shared_ptr<Code>& code);
+    tuple<string,string,string> print_data_structure(const TypeSignature type);
+    string print_type_from(const deque<TypeSignature> &tys, const shared_ptr<Lambda> &lam);
+    string c_type_name(string s);
+    string new_tmptype(const TypeSignature type);
+    string new_dummy_var();
+    void paircat(tuple<string,string,string> &x, const tuple<string,string,string> &&y);
+    // v.main <+ v.env
+    string compress(const Compiled &&v);
+    // a += b
+    void paircat(Compiled &a, const Compiled &&b);
+};
+
 class ocamlgen {
 private:
     stack<shared_ptr<Code>> argstack;

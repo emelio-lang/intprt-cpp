@@ -217,6 +217,7 @@ void set_arity::operator () (const shared_ptr<Code> c) {
     }
 
 //    cout << "a" << endl;
+    cout << *c << endl;
 
     c->arity -= c->args.size();
 }
@@ -382,8 +383,8 @@ void set_type::operator () (const shared_ptr<Code> c) {
 // #include "codegen3.cpp"
 // #include "codegen4.cpp"
 // #include "codegen5.cpp"
-// #include "codegen6.cpp"
-#include "ocamlgen.cpp"
+#include "codegen7.cpp"
+//#include "ocamlgen.cpp"
 
 vector<string> split_instr(string instr) {
     vector<string> res;

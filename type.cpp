@@ -46,6 +46,43 @@ void wrap(TypeSignature &typesig, const TypeSignature &wrp) {
 }
 
 
+// A->(B->C)   ====>  A-B->C
+void _normalize_fn_fn(TypeSignature &typesig) {
+    if (MATCHS(TypeFn)(typesig)) {
+        auto outer_fn = PURES(TypeFn)(typesig);
+        _normalize_fn_fn(outer_fn->to);
+        for (auto &e : outer_fn->from) {
+            _normalize_fn_fn(e);
+        }
+
+        if (MATCHS(TypeFn)(outer_fn->to)) {
+            auto to_fn = PURES(TypeFn)(outer_fn->to);
+            TypeFn new_fntype;
+            deep_copy_from(new_fntype.to, to_fn->to);
+            for (int i = 0; i < outer_fn->from.size(); i++) {
+                new_fntype.from.emplace_back(shared_ptr<TypeFn>(nullptr));
+                deep_copy_from(new_fntype.from.back(), outer_fn->from[i]);
+            }
+            for (int i = 0; i < to_fn->from.size(); i++) {
+                new_fntype.from.emplace_back(shared_ptr<TypeFn>(nullptr));
+                deep_copy_from(new_fntype.from.back(), to_fn->from[i]);
+            }
+            typesig = make_shared<TypeFn>(new_fntype);
+        }
+    } else if (MATCHS(TypeSum)(typesig)) {
+        auto outer_fn = PURES(TypeSum)(typesig);
+        for (auto &e : outer_fn->sums) {
+            _normalize_fn_fn(e);
+        }
+    } else if (MATCHS(TypeProduct)(typesig)) {
+        auto outer_fn = PURES(TypeProduct)(typesig);
+        for (auto &e : outer_fn->products) {
+            _normalize_fn_fn(e);
+        }
+    } else if (MATCH(string)(typesig)) {
+    }
+}
+
 // (A|B)->C   ====>  (A->C|B->C)
 void _normalize_fn_sum(TypeSignature &typesig) {
     // (A1|A2|A3|...) -> C
@@ -175,6 +212,11 @@ void _normalize_simile(TypeSignature &typesig) {
 void normalize(TypeSignature &typesig) {
     TypeSignature tmp;
     deep_copy_from(tmp, typesig);
+    while (true) {
+        _normalize_fn_fn(typesig);
+        if (equal(tmp, typesig)) break;
+        deep_copy_from(tmp, typesig);
+    }
     while (true) {
         _normalize_fn_sum(typesig);
         if (equal(tmp, typesig)) break;

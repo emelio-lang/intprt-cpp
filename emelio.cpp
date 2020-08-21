@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
         extract_all_notations(root, true);
         cout << *root << endl;
         rename_variables(root);
-//        set_arity()(root);
+        set_arity()(root);
         set_type()(root);
        
         cout << *root << endl;
@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
         cout << 'a' << endl;
 //        cout << transpile(root, "c");
         Compiled result;
-        result = ocamlgen()(root);
+        result = codegen7()(root);
 
         cout << result.env << result.body << ";;";
 //        cout << "prepare name hash:\n";

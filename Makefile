@@ -25,7 +25,7 @@ transpile.o: transpile.cpp emelio.h util.h notation.h
 	g++ -pg --std=c++2a  -c $< -g3 -o $@
 # codegen.o: codegen.cpp emelio.h util.h notation.h codegen.h codegen*.cpp ocamlgen.cpp
 # 	g++ -pg --std=c++2a  -c $< -g3 -o $@
-codegen.o: codegen.cpp emelio.h util.h notation.h codegen.h codegen6.cpp ocamlgen.cpp
+codegen.o: codegen.cpp emelio.h util.h notation.h codegen.h codegen7.cpp ocamlgen.cpp
 	g++ -pg --std=c++2a  -c $< -g3 -o $@
 type.o: type.cpp emelio.h util.h
 	g++ -pg --std=c++2a  -c $< -g3 -o $@

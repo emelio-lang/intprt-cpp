@@ -94,6 +94,7 @@ ocamlgen::operator () (const shared_ptr<Code> &c) {
         return res;
     } else if (c->lit.val == "fuse") {
         Compiled res;
+        // なんかOcaml、Emelioほど型が自由じゃないみたいなので、型ごとに別々に関数を作っておきます
         Guard guard = get_guard(c->args);
         GuardType gtype = get_guard_type(c->args);
 
@@ -132,7 +133,7 @@ ocamlgen::operator () (const shared_ptr<Code> &c) {
                         const string name = c->l->argnames[j];
                         const string type = PURE(string)(PURES(TypeFn)(c->type)->from[j]);
                         
-                        matchlist += type + " " + name;
+                        matchlist += ocaml_type_name(type) + " " + name;
                         if (i == c->l->argnames.size()) {
                             matchlist += ", ";
                         }

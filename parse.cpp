@@ -167,7 +167,7 @@ TypeSignature type_signature(ParserFlow& p);
                 break;
             } else {
                 l->argnames.emplace_back(NOW);
-                l->argarities.emplace_back(0);
+                l->argarities.emplace_back(-1);
                 l->argqualities.emplace_back(ArgQuality {});
 
                 if (NEXT == ":") {
