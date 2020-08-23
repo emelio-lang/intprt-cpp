@@ -95,23 +95,23 @@ int main(int argc, char **argv) {
         // ofs1 << result.body << endl;
         // ofs2 << result.env << endl;
 
-        ofstream ofs3("compiled/code7.cpp");
+        ofstream ofs3("compiled/code7.c");
         ofs3 << "#include <stdio.h>" << endl;
-        ofs3 << "inline int add(int x, int y) { return x + y; }" << endl;
-        ofs3 << "inline int sub(int x, int y) { return x - y; }" << endl;
-        ofs3 << "inline int mul(int x, int y) { return x * y; }" << endl;
+        ofs3 << "#include <stdbool.h>" << endl;
         ofs3 << result.global << endl << endl;
         ofs3 << "int __main__() { " << endl;
         ofs3 << result.env << endl;
         if (result.return_required) ofs3 << "return " << result.body << ";" << endl;
         else ofs3 << result.body << endl;
         ofs3 << "}" << endl;
-        ofs3 << "int main() { /*printf(\"%d\\n\", ); */ return __main__(); }" << endl << endl;
+        ofs3 << "int main() { printf(\"%d\\n\", __main__()); return 0; }" << endl << endl;
 
         // cout << "#include <stdio.h>" << endl;
         // cout << "int __main__() { " << endl;
+        cout << result.global << endl;
         cout << result.env << endl;
-        cout << "return " << result.body << ";" << endl;
+        if (result.return_required) cout << "return " << result.body << ";" << endl;
+        else cout << result.body << endl;
         // cout << "}" << endl;
         // cout << "void main() { printf(\"%d\\n\", __main__()); }" << endl << endl;
 
