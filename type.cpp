@@ -9,6 +9,23 @@ TypeSignature arg(const TypeSignature &typesig, int n) {
     return fn->from[n];
 }
 
+
+TypeSignature sumfactor(const shared_ptr<TypeSum> &sumtype) {
+    TypeSignature res = shared_ptr<TypeFn>(new TypeFn);
+    auto fn = PURES(TypeFn)(res);
+    deep_copy_from(fn->to, PURES(TypeFn)(sumtype->sums[0])->to);
+    for (int i = 0; i < arity(sumtype->sums[0]); i++) {
+        TypeSignature new_sumtype = shared_ptr<TypeSum>(new TypeSum);
+        auto sum = PURES(TypeSum)(new_sumtype);
+        for (int j = 0; j < sumtype->sums.size(); j++) {
+            sum->sums.emplace_back();
+            deep_copy_from(sum->sums.back(), PURES(TypeFn)(sumtype->sums[j])->from[i]);
+        }
+        fn->from.emplace_back(new_sumtype);
+    }
+    return res;
+}
+
 void apply(TypeSignature &typesig, const int _n) {
     if (_n <= 0) return;
     ASSERT(MATCHS(TypeFn)(typesig), "関数型にしか適用できません apply ( " + to_string(typesig) + ", " + to_string(_n) + " )");
@@ -95,7 +112,7 @@ void _normalize_fn_sum(TypeSignature &typesig) {
 
         for (int i = outer_fn->from.size()-1; i >= 0; --i) {
             auto &from = outer_fn->from[i];
-            cout << i << endl;
+//            cout << i << endl;
             if (MATCHS(TypeSum)(from)) {
                 auto codom_sum = PURES(TypeSum)(from);
                 TypeSum new_sumtype;
@@ -271,6 +288,7 @@ bool equal(const TypeSignature &ts1, const TypeSignature &ts2) {
         unordered_set<TypeSignature> b(PURES(TypeSum)(ts2)->sums.begin(), PURES(TypeSum)(ts2)->sums.end());
         return a == b;
     } else if (MATCHS(TypeProduct)(ts1) && MATCHS(TypeProduct)(ts2)) {
+        if (PURES(TypeProduct)(ts1)->products.size() != PURES(TypeProduct)(ts2)->products.size()) return false;
         for (int i = 0; i < PURES(TypeProduct)(ts1)->products.size(); ++i) {
             res = res && equal(PURES(TypeProduct)(ts1)->products[i], PURES(TypeProduct)(ts2)->products[i]);
         }
@@ -279,7 +297,10 @@ bool equal(const TypeSignature &ts1, const TypeSignature &ts2) {
         return PURE(string)(ts1) == PURE(string)(ts2);
     } else return false;
 }
-bool operator==(const TypeSignature &ts1, const TypeSignature &ts2) { return equal(ts1, ts2); }
+bool operator==(const TypeSignature &ts1, const TypeSignature &ts2) {
+    bool res = equal(ts1, ts2);
+    return res;
+}
 
 void deep_copy_from(TypeSignature &ts_dst, const TypeSignature &ts_src) {
     if (MATCHS(TypeFn)(ts_src)) {

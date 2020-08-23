@@ -1,1 +1,1 @@
-(|addn:(int->(int->int))| (addn 3) 100) (|n:int| (|a:int| add a n))
+(fuse (|0:int| 1) (|x:int| x)) 3

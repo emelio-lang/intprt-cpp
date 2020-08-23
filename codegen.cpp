@@ -251,8 +251,8 @@ void set_type::operator () (const shared_ptr<Code> c) {
         // 2 合致することを確かめます
         for (int i = 0; i < min(c->args.size(),c->l->argnames.size()); i++) {
             auto argname = c->l->argnames[i];
-            auto a = normalized(bind[argname]);
-            auto b = normalized(c->args[i]->type);
+            TypeSignature a = normalized(bind[argname]);
+            TypeSignature b = normalized(c->args[i]->type);
             ASSERT(verify(a, b),
                    ("引数"+argname+"の型が合致しません. (expected:" + to_string(a) +
                     " inferred:"+to_string(b)+")"));
@@ -298,7 +298,7 @@ void set_type::operator () (const shared_ptr<Code> c) {
     }
     else if (c->lit.val == "fuse") {
         c->type = shared_ptr<TypeSum>(new TypeSum);
-        // TODO
+
         for (int i = c->args.size()-1; i >= 0; i--) {
             (set_type(&bind))(c->args[i]);
             // argstack.push(c->args[i]);
@@ -307,6 +307,8 @@ void set_type::operator () (const shared_ptr<Code> c) {
 
         if (PURES(TypeSum)(c->type)->sums.size() == 1)
             c->type = c->args[0]->type;
+        else
+            c->type = sumfactor(PURES(TypeSum)(c->type));
     }
     else if (c->lit.val == "type") {
         shared_ptr<TypeFn> new_type_fn = shared_ptr<TypeFn>(new TypeFn);
@@ -342,12 +344,9 @@ void set_type::operator () (const shared_ptr<Code> c) {
 
         int i = 0;
         for (auto a : c->args) {
-            cout << 'a' << endl;
             cout << to_string(arg(bf2typesig.at(c->lit.val),i)) << endl;
-            auto x = normalized(arg(bf2typesig.at(c->lit.val),i));
-            cout << 'a' << endl;
-            auto y = normalized(c->args[i]->type);
-            cout << 'a' << endl;
+            TypeSignature x = normalized(arg(bf2typesig.at(c->lit.val),i));
+            TypeSignature y = normalized(c->args[i]->type);
             ASSERT(verify(x, y),
                    "'"+c->lit.val+"'の"+to_string(i)+"番目の引数の型が合致しません. (expected:" + to_string(bf2typesig.at(c->lit.val)) +
                    " inferred:"+to_string(c->args[i]->type)+")");

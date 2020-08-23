@@ -107,7 +107,8 @@ struct BindInfo {
 };
 
 struct Compiled {
-    string body="", env="";
+    string body="", env="", global="";
+    bool return_required=true; // return body;としてよいか
 };
 
 class codegen3 {
@@ -245,14 +246,50 @@ public:
     void paircat(Compiled &a, const Compiled &&b);
 };
 
+
+template<class Key, class T>
+class pseudo_map {
+public:
+    T& operator[](const Key& x);
+    bool contains(const Key& k) const;
+private:
+    deque<Key> keys;
+    deque<T> vals;
+};
+
+template<class Key, class T>
+T& pseudo_map<Key,T>::operator[](const Key& x) {
+    if (contains(x)) {
+        return vals[distance(keys.begin(), find(keys.begin(), keys.end(), x))];
+    } else {
+        keys.emplace_back(x);
+        vals.emplace_back();
+        return vals.back();
+    }
+}
+
+template <class K, class T>
+bool pseudo_map<K,T>::contains(const K& k) const {
+    for (int i = 0; i < keys.size(); i++) {
+        if (keys[i] == k) return true;
+    }
+    return false;
+}
+
+
 class codegen7 {
 private:
     stack<shared_ptr<Code>> argstack;
     stack<shared_ptr<Code>> dummy_argstack;
     static map<string, TypeSignature> data_bind; // TODO: スコープいいの？
+    // fuseは特別な名前で実体が作られるので元の名前からその名前への写像
+    static map<string, string> fuse_bind;
     
     // TODO hashを作ってunordered_map<TypeSignature, string>に作った型情報を保存して使い回すようにする
-    unordered_map<TypeSignature, string> tmptypes;
+    static pseudo_map<TypeSignature, string> tmptypes;
+    // deque<TypeSignature> tmptypes;
+    // deque<string> tmptypes_name;
+    
     static unsigned int type_count;
     static unsigned int dummy_count;
 
@@ -261,6 +298,7 @@ public:
     codegen7() {}
     ~codegen7() {}
     Compiled operator () (const shared_ptr<Code> &c);
+    Compiled fuse(const shared_ptr<Code> &c);
     string print_def(string name, const shared_ptr<Code>& code);
     tuple<string,string,string> print_data_structure(const TypeSignature type);
     string print_type_from(const deque<TypeSignature> &tys, const shared_ptr<Lambda> &lam);
@@ -272,6 +310,7 @@ public:
     string compress(const Compiled &&v);
     // a += b
     void paircat(Compiled &a, const Compiled &&b);
+    void paircat(Compiled &a, const Compiled &b);
 };
 
 class ocamlgen {

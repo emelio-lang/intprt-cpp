@@ -38,6 +38,7 @@
 #define MATCHS(t) holds_alternative<shared_ptr<t>>
 #define PURE(t) get<t>
 #define PURES(t) get<shared_ptr<t>>
+#define ELIMINATE(v,x,y) ((v) == (x) ? (y) : (v))
 
 
 #define internal_global static
@@ -89,6 +90,7 @@ bool arity(const TypeSignature &ts);
 bool operator==(const TypeSignature &ts1, const TypeSignature &ts2);
 void deep_copy_from(TypeSignature &ts_dst, const TypeSignature &ts_src);
 string to_string(const TypeSignature &typesig);
+TypeSignature sumfactor(const shared_ptr<TypeSum> &sumtype);
 void _normalize(TypeSignature &typesig);
 void normalize(TypeSignature &typesig);
 TypeSignature normalized(const TypeSignature &typesig);
