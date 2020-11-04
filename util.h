@@ -24,6 +24,7 @@ using namespace std;
 void ASSERT(bool glass, std::string msg);
 
 vector<string> split(const string &s, char delim);
+std::string join(const std::vector<std::string>& v, const char* delim = 0);
     
 template<typename Char, typename Traits, typename Allocator>
 std::basic_string<Char, Traits, Allocator> operator *
@@ -32,6 +33,10 @@ std::basic_string<Char, Traits, Allocator> operator *
 template<typename Char, typename Traits, typename Allocator>
 std::basic_string<Char, Traits, Allocator> operator *
 (size_t n, const std::basic_string<Char, Traits, Allocator>& s);
+
+
+template<typename Key, typename T>
+std::ostream& operator<<(std::ostream& stream, const std::map<Key,T>& m);
 
 bool is_number(const std::string& s);
 bool is_string_literal(const std::string& s);

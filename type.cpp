@@ -2,6 +2,7 @@
 #include "emelio.h"
 #include <sstream>
 
+
 TypeSignature arg(const TypeSignature &typesig, int n) {
     ASSERT(MATCHS(TypeFn)(typesig), "関数型でしか呼べない関数 arg ( " + to_string(typesig) + ", " + to_string(n) + " )");
     auto fn = PURES(TypeFn)(typesig);
@@ -97,6 +98,8 @@ void _normalize_fn_fn(TypeSignature &typesig) {
             _normalize_fn_fn(e);
         }
     } else if (MATCH(string)(typesig)) {
+    } else if (MATCH(SpecialValue)(typesig)) {
+    } else if (MATCHS(Parametered)(typesig)) {
     }
 }
 
@@ -140,6 +143,8 @@ void _normalize_fn_sum(TypeSignature &typesig) {
             _normalize_fn_sum(e);
         }
     } else if (MATCH(string)(typesig)) {
+    } else if (MATCH(SpecialValue)(typesig)) {
+    } else if (MATCHS(Parametered)(typesig)) {
     }
 }
 
@@ -177,6 +182,51 @@ void _normalize_fn_prod(TypeSignature &typesig) {
             _normalize_fn_prod(e);
         }
     } else if (MATCH(string)(typesig)) {
+    } else if (MATCH(SpecialValue)(typesig)) {
+    } else if (MATCHS(Parametered)(typesig)) {
+    }
+}
+
+// (A (B|C)) =====> (A B) | (A C)
+void _normalize_bunpai(TypeSignature &typesig) {
+        // (A1|A2|A3|...) -> C
+    if (MATCHS(TypeFn)(typesig)) {
+        auto outer_fn = PURES(TypeFn)(typesig);
+        _normalize_bunpai(outer_fn->to);
+        for (auto &e : outer_fn->from) {
+            _normalize_bunpai(e);
+        }
+    } else if (MATCHS(TypeSum)(typesig)) {
+        for (auto &e : PURES(TypeSum)(typesig)->sums) {
+            _normalize_bunpai(e);
+        }
+    } else if (MATCHS(TypeProduct)(typesig)) {
+        // (A ...  (B|C)) について、逆からsumを見つけては((A ... B)|(A ... C))にする変形を行う
+        auto outer_fn = PURES(TypeProduct)(typesig);
+        TypeSignature res;
+        for (int i = outer_fn->products.size()-1; i >= 0; i--) {
+            auto e = outer_fn->products[i];
+            _normalize_bunpai(e);
+            if (MATCHS(TypeSum)(e)) {
+                auto &target_sum = PURES(TypeSum)(e);
+                res = shared_ptr<TypeSum>(new TypeSum);
+                auto &resp = PURES(TypeSum)(res);
+
+                for (int j = 0; j < target_sum->sums.size(); j++) {
+                    resp->sums.emplace_back();
+                    // NOTE: namesについてもこれでうまくいく
+                    deep_copy_from(resp->sums.back(), typesig);
+                    deep_copy_from(PURES(TypeProduct)(resp->sums.back())->products[i],
+                                   target_sum->sums[j]);
+                }
+                typesig = res;
+                break;
+            }
+        }
+        
+    } else if (MATCH(string)(typesig)) {    
+    } else if (MATCH(SpecialValue)(typesig)) {    
+    } else if (MATCHS(Parametered)(typesig)) {
     }
 }
 
@@ -214,15 +264,23 @@ void _normalize_simile(TypeSignature &typesig) {
         for (auto &e : outer_fn->products) {
             _normalize_simile(e);
             if (MATCHS(TypeProduct)(e)) {
+                int k = 0;
                 for (auto &j : PURES(TypeProduct)(e)->products) {
-                    resp->products.push_back(j);
-                    i++;
+                    resp->products.emplace_back(j);
+                    resp->names.emplace_back(PURES(TypeProduct)(e)->names[i]);
+                    k++;
                 }
-            } else resp->products.push_back(e);
+            } else {
+                resp->products.emplace_back(e);
+                resp->names.emplace_back(outer_fn->names[i]);
+            }
+            i++;
         }
         
         typesig = res;
-    } else if (MATCH(string)(typesig)) {
+    } else if (MATCH(string)(typesig)) {    
+    } else if (MATCH(SpecialValue)(typesig)) {    
+    } else if (MATCHS(Parametered)(typesig)) {
     }
 }
 
@@ -245,6 +303,11 @@ void normalize(TypeSignature &typesig) {
         deep_copy_from(tmp, typesig);
     }
     while (true) {
+        _normalize_bunpai(typesig);
+        if (equal(tmp, typesig)) break;
+        deep_copy_from(tmp, typesig);
+    }
+    while (true) {
         _normalize_simile(typesig);
         if (equal(tmp, typesig)) break;
         deep_copy_from(tmp, typesig);
@@ -258,44 +321,214 @@ TypeSignature normalized(const TypeSignature &typesig) {
     return res;
 }
 
-bool verify(const TypeSignature &ts1, const TypeSignature &ts2) {
-    if (ts1 == ts2) return true;
+// bool verify(const TypeSignature &ts1, const TypeSignature &ts2, const map<string,TypeSignature> &bind) {
+//     if (equal(ts1,ts2,bind)) return true;
+//     else return false;
 
-    if (MATCHS(TypeSum)(ts1)) {
-        unordered_set<TypeSignature> a(PURES(TypeSum)(ts1)->sums.begin(), PURES(TypeSum)(ts1)->sums.end());
-        if (a.contains(ts2)) return true;
-    } else if ((MATCH(string)(ts1) && PURE(string)(ts1) == "any") || (MATCH(string)(ts2) && PURE(string)(ts2) == "any")) {
+//     if (MATCHS(TypeSum)(ts1)) {
+//         for (int i = 0; i < PURES(TypeSum)(ts1)->sums.size(); ++i) {
+//             bool tmp = false;
+//             for (int j = 0; j < PURES(TypeSum)(ts2)->sums.size(); ++j) {
+//                 tmp = tmp || equal(PURES(TypeSum)(ts1)->sums[i], PURES(TypeSum)(ts2)->sums[j], bind);
+//             }
+//             if (!tmp) return false;
+//         }
+//         return true;
+//     } else {
+//     }
+// }
+
+
+// bool equal(const TypeSignature &ts1, const TypeSignature &ts2) {
+//     bool res = true;
+
+//     if (MATCHS(TypeFn)(ts1) && MATCHS(TypeFn)(ts2)) {
+//         cout << to_string(ts1) << " " << to_string(ts2) << endl;
+//         res = res && equal(PURES(TypeFn)(ts1)->to, PURES(TypeFn)(ts2)->to);
+//         cout << res << endl;
+//         res = res && PURES(TypeFn)(ts1)->from.size() == PURES(TypeFn)(ts2)->from.size();
+//         cout << res << endl;
+//         for (int i = 0; i < PURES(TypeFn)(ts1)->from.size(); ++i) {
+//             cout << res << endl;
+//             res = res && equal(PURES(TypeFn)(ts1)->from[i], PURES(TypeFn)(ts2)->from[i]);
+//         }
+//         return res;
+//     } else if (MATCHS(TypeSum)(ts1) && MATCHS(TypeSum)(ts2)) {
+//         unordered_set<TypeSignature> a(PURES(TypeSum)(ts1)->sums.begin(), PURES(TypeSum)(ts1)->sums.end());
+//         unordered_set<TypeSignature> b(PURES(TypeSum)(ts2)->sums.begin(), PURES(TypeSum)(ts2)->sums.end());
+//         return a == b;
+//     } else if (MATCHS(TypeProduct)(ts1) && MATCHS(TypeProduct)(ts2)) {
+//         if (PURES(TypeProduct)(ts1)->products.size() != PURES(TypeProduct)(ts2)->products.size()) return false;
+//         for (int i = 0; i < PURES(TypeProduct)(ts1)->products.size(); ++i) {
+//             res = res && equal(PURES(TypeProduct)(ts1)->products[i], PURES(TypeProduct)(ts2)->products[i]);
+//         }
+//         return res;
+//     } else if (MATCH(string)(ts1) && MATCH(string)(ts2)) {
+//         return PURE(string)(ts1) == PURE(string)(ts2);
+//     } else if (MATCHS(Parametered)(ts1) && MATCHS(Parametered)(ts2)) {
+//         if (PURES(Parametered)(ts1)->params.size() != PURES(Parametered)(ts2)->params.size()) return false;
+//         res = PURES(Parametered)(ts1)->type == PURES(Parametered)(ts2)->type;
+//         for (int i = 0; i < PURES(Parametered)(ts1)->params.size(); i++) {
+//             res = res && equal(PURES(Parametered)(ts1)->params[i], PURES(Parametered)(ts2)->params[i]);
+//         }
+//     } else return false;
+// }
+bool equal(const TypeSignature &ts1, const TypeSignature &ts2, const map<string,TypeSignature> &bind, int lvl) {
+    bool res = true;
+
+    if ((MATCH(string)(ts1) && PURE(string)(ts1) == "any") &&
+        (MATCH(string)(ts2) && PURE(string)(ts2) == "any")) {
         return true;
     }
-    return false;
-}
 
-bool equal(const TypeSignature &ts1, const TypeSignature &ts2) {
-    bool res = true;
+    // bool ts1_expandable = MATCH(string)(ts1) && bind.contains(PURE(string)(ts1));
+    // bool ts2_expandable = MATCH(string)(ts2) && bind.contains(PURE(string)(ts2));
+    // // 1のほうが、ただのstringで、newtypeとして定義されたものならば、それを一回だけ展開してそれを比較する
+    // if ((ts1_expandable || ts2_expandable) && lvl < 2) {
+    //     cout << "Expand" << endl;
+    //     res = equal(ts1_expandable ? bind.at(PURE(string)(ts1)) : ts1,
+    //                 ts2_expandable ? bind.at(PURE(string)(ts2)) : ts2,
+    //                 bind, lvl+1);
+
+    //     if (res)
+    //         cout << "-> true" << endl;
+    //     else
+    //         cout << "-> false" << endl;
+    //     return res;
+    // }
+
     if (MATCHS(TypeFn)(ts1) && MATCHS(TypeFn)(ts2)) {
-        cout << to_string(ts1) << " " << to_string(ts2) << endl;
-        res = res && equal(PURES(TypeFn)(ts1)->to, PURES(TypeFn)(ts2)->to);
-        cout << res << endl;
-        res = res && PURES(TypeFn)(ts1)->from.size() == PURES(TypeFn)(ts2)->from.size();
-        cout << res << endl;
+        cout << "Function-wise" << endl;
+        res = equal(PURES(TypeFn)(ts1)->to, PURES(TypeFn)(ts2)->to, bind, lvl) && res;
+        res = PURES(TypeFn)(ts1)->from.size() == PURES(TypeFn)(ts2)->from.size() && res;
         for (int i = 0; i < PURES(TypeFn)(ts1)->from.size(); ++i) {
-            cout << res << endl;
-            res = res && equal(PURES(TypeFn)(ts1)->from[i], PURES(TypeFn)(ts2)->from[i]);
+            res = equal(PURES(TypeFn)(ts1)->from[i], PURES(TypeFn)(ts2)->from[i], bind, lvl) && res;
         }
-        return res;
-    } else if (MATCHS(TypeSum)(ts1) && MATCHS(TypeSum)(ts2)) {
-        unordered_set<TypeSignature> a(PURES(TypeSum)(ts1)->sums.begin(), PURES(TypeSum)(ts1)->sums.end());
-        unordered_set<TypeSignature> b(PURES(TypeSum)(ts2)->sums.begin(), PURES(TypeSum)(ts2)->sums.end());
-        return a == b;
     } else if (MATCHS(TypeProduct)(ts1) && MATCHS(TypeProduct)(ts2)) {
+        cout << "Product-wise" << endl;
         if (PURES(TypeProduct)(ts1)->products.size() != PURES(TypeProduct)(ts2)->products.size()) return false;
         for (int i = 0; i < PURES(TypeProduct)(ts1)->products.size(); ++i) {
-            res = res && equal(PURES(TypeProduct)(ts1)->products[i], PURES(TypeProduct)(ts2)->products[i]);
+            res = equal(PURES(TypeProduct)(ts1)->products[i], PURES(TypeProduct)(ts2)->products[i], bind, lvl) && res;
         }
-        return res;
     } else if (MATCH(string)(ts1) && MATCH(string)(ts2)) {
-        return PURE(string)(ts1) == PURE(string)(ts2);
-    } else return false;
+        cout << "string" << endl;
+        res = PURE(string)(ts1) == PURE(string)(ts2);
+    } else if (MATCH(SpecialValue)(ts1) && MATCH(SpecialValue)(ts2)) {
+        cout << "SpecialValue" << endl;
+        res = PURE(SpecialValue)(ts1).val == PURE(SpecialValue)(ts2).val;
+    } else if (MATCHS(Parametered)(ts1) && MATCHS(Parametered)(ts2)) {
+        cout << "Parametered" << endl;
+        if (PURES(Parametered)(ts1)->params.size() != PURES(Parametered)(ts2)->params.size()) return false;
+        res = PURES(Parametered)(ts1)->type == PURES(Parametered)(ts2)->type;
+        for (int i = 0; i < PURES(Parametered)(ts1)->params.size(); i++) {
+            res = equal(PURES(Parametered)(ts1)->params[i], PURES(Parametered)(ts2)->params[i], bind, lvl) && res;
+        }
+    } else if (MATCHS(TypeSum)(ts1) && MATCHS(TypeSum)(ts2)) {
+        res = true;
+        for (auto s2 : PURES(TypeSum)(ts2)->sums) {
+            bool tmp = false;
+            for (auto s1 : PURES(TypeSum)(ts1)->sums) {
+                cout << "1 sum-wise" << PURES(TypeSum)(ts1)->sums.size() << endl;
+                if (equal(s1, s2, bind, lvl)) {
+                    tmp = true;
+                    break;
+                }
+            }
+            res = res && tmp;
+            if (!res) break;
+        }
+    // } else if () {
+    //     res = false;
+    //     for (auto s2 : PURES(TypeSum)(ts2)->sums) {
+    //         cout << "2 sum-wise" << endl;
+    //         res = equal(ts1, s2, bind, lvl) || res;
+    //     }
+    } else {
+        res = false;
+    }
+
+    if (res)
+        cout << "-> true" << endl;
+    else
+        cout << "-> false" << endl;
+
+    return res;
+}
+
+bool verify(const TypeSignature &ts1, const TypeSignature &ts2, const map<string,TypeSignature> &bind, int lvl) {
+    bool res = true;
+
+    cout << to_string(ts1) << " " << to_string(ts2) << endl;
+    if ((MATCH(string)(ts1) && PURE(string)(ts1) == "any") ||
+        (MATCH(string)(ts2) && PURE(string)(ts2) == "any")) {
+        cout << "-> true" << endl;
+        return true;
+    }
+
+    bool ts1_expandable = MATCH(string)(ts1) && bind.contains(PURE(string)(ts1));
+    bool ts2_expandable = MATCH(string)(ts2) && bind.contains(PURE(string)(ts2));
+    // 1のほうが、ただのstringで、newtypeとして定義されたものならば、それを一回だけ展開してそれを比較する
+    if ((ts1_expandable || ts2_expandable) && lvl < 2) {
+        cout << "Expand" << endl;
+        res = verify(ts1_expandable ? bind.at(PURE(string)(ts1)) : ts1,
+                    ts2_expandable ? bind.at(PURE(string)(ts2)) : ts2,
+                    bind, lvl+1);
+
+        if (res)
+            cout << "-> true" << endl;
+        else
+            cout << "-> false" << endl;
+        return res;
+    }
+
+    if (MATCHS(TypeFn)(ts1) && MATCHS(TypeFn)(ts2)) {
+        cout << "Function-wise" << endl;
+        res = verify(PURES(TypeFn)(ts1)->to, PURES(TypeFn)(ts2)->to, bind, lvl) && res;
+        res = PURES(TypeFn)(ts1)->from.size() == PURES(TypeFn)(ts2)->from.size() && res;
+        for (int i = 0; i < PURES(TypeFn)(ts1)->from.size(); ++i) {
+            res = verify(PURES(TypeFn)(ts1)->from[i], PURES(TypeFn)(ts2)->from[i], bind, lvl) && res;
+        }
+    } else if (MATCHS(TypeProduct)(ts1) && MATCHS(TypeProduct)(ts2)) {
+        cout << "Product-wise" << endl;
+        if (PURES(TypeProduct)(ts1)->products.size() != PURES(TypeProduct)(ts2)->products.size()) return false;
+        for (int i = 0; i < PURES(TypeProduct)(ts1)->products.size(); ++i) {
+            res = verify(PURES(TypeProduct)(ts1)->products[i], PURES(TypeProduct)(ts2)->products[i], bind, lvl) && res;
+        }
+    } else if (MATCH(string)(ts1) && MATCH(string)(ts2)) {
+        cout << "string" << endl;
+        res = PURE(string)(ts1) == PURE(string)(ts2);
+    } else if (MATCH(SpecialValue)(ts1) && MATCH(SpecialValue)(ts2)) {
+        cout << "SpecialValue" << endl;
+        res = PURE(SpecialValue)(ts1).val == PURE(SpecialValue)(ts2).val;
+    } else if (MATCHS(Parametered)(ts1) && MATCHS(Parametered)(ts2)) {
+        cout << "Parametered" << endl;
+        if (PURES(Parametered)(ts1)->params.size() != PURES(Parametered)(ts2)->params.size()) return false;
+        res = PURES(Parametered)(ts1)->type == PURES(Parametered)(ts2)->type;
+        for (int i = 0; i < PURES(Parametered)(ts1)->params.size(); i++) {
+            res = verify(PURES(Parametered)(ts1)->params[i], PURES(Parametered)(ts2)->params[i], bind, lvl) && res;
+        }
+    } else if (MATCHS(TypeSum)(ts1)) {
+        res = false;
+        for (auto s1 : PURES(TypeSum)(ts1)->sums) {
+            cout << "1 sum-wise" << PURES(TypeSum)(ts1)->sums.size() << endl;
+            res = verify(ts2, s1, bind, lvl) || res;
+        }
+    } else if (MATCHS(TypeSum)(ts2)) {
+        res = false;
+        for (auto s2 : PURES(TypeSum)(ts2)->sums) {
+            cout << "2 sum-wise" << endl;
+            res = verify(ts1, s2, bind, lvl) || res;
+        }
+    } else {
+        res = false;
+    }
+
+    if (res)
+        cout << "-> true" << endl;
+    else
+        cout << "-> false" << endl;
+
+    return res;
 }
 bool operator==(const TypeSignature &ts1, const TypeSignature &ts2) {
     bool res = equal(ts1, ts2);
@@ -320,11 +553,24 @@ void deep_copy_from(TypeSignature &ts_dst, const TypeSignature &ts_src) {
     } else if (MATCHS(TypeProduct)(ts_src)) {
         ts_dst = shared_ptr<TypeProduct>(new TypeProduct);
         PURES(TypeProduct)(ts_dst)->products.resize(PURES(TypeProduct)(ts_src)->products.size());
+        PURES(TypeProduct)(ts_dst)->names.resize(PURES(TypeProduct)(ts_src)->products.size());
         for (int i = 0; i < PURES(TypeProduct)(ts_src)->products.size(); ++i) {
             deep_copy_from(PURES(TypeProduct)(ts_dst)->products[i], PURES(TypeProduct)(ts_src)->products[i]);
+            PURES(TypeProduct)(ts_dst)->names[i] = PURES(TypeProduct)(ts_src)->names[i];
         }
     } else if (MATCH(string)(ts_src)) {
         ts_dst = PURE(string)(ts_src);
+    } else if (MATCH(SpecialValue)(ts_src)) {
+        ts_dst = PURE(SpecialValue)(ts_src);
+    } else if (MATCHS(Parametered)(ts_src)) {
+        ts_dst = shared_ptr<Parametered>(new Parametered);
+        auto &param1 = PURES(Parametered)(ts_src);
+        auto &param2 = PURES(Parametered)(ts_dst);
+        param2->type =  param1->type;
+        for (auto e : param1->params) {
+            param2->params.emplace_back();
+            deep_copy_from(param2->params.back(), e);
+        }
     }
 }
 
@@ -356,6 +602,15 @@ string to_string(const TypeSignature &typesig) {
         ss << '\b' << ")";
     } else if (MATCH(string)(typesig)) {
         ss << PURE(string)(typesig);
+    } else if (MATCH(SpecialValue)(typesig)) {
+        ss << "*" << PURE(SpecialValue)(typesig).val;
+    } else if (MATCHS(Parametered)(typesig)) {
+        auto &param = PURES(Parametered)(typesig);
+        ss << param->type << "<";
+        for (auto e : param->params) {
+            ss << to_string(e) << ",";
+        }
+        ss << ">";
     }
     return ss.str();
 }

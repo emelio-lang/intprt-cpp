@@ -129,6 +129,7 @@ ocamlgen::operator () (const shared_ptr<Code> &c) {
                     int i = 0;
                     string matchlist = "";
                     for (int j = 0; j < c->l->argnames.size(); j++) {
+                        // TODO: parametered対応
                         assert(MATCH(string)(PURES(TypeFn)(c->type)->from[j]));
                         const string name = c->l->argnames[j];
                         const string type = PURE(string)(PURES(TypeFn)(c->type)->from[j]);

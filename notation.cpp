@@ -308,6 +308,6 @@ check_match_notation (shared_ptr<Code> &code, const vector<string> &config, int 
         }
     }
     
-            cout << "Checked." << endl;
+    cout << "Checked." << endl;
     return true;
 }

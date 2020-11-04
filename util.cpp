@@ -26,6 +26,18 @@ void ASSERT(bool glass, std::string msg) {
     }
 }
 
+std::string join(const std::vector<std::string>& v, const char* delim) {
+    std::string s;
+    if (!v.empty()) {
+        s += v[0];
+        for (decltype(v.size()) i = 1, c = v.size(); i < c; ++i) {
+            if (delim) s += delim;
+            s += v[i];
+        }
+    }
+    return s;
+}
+
 
 bool is_number(const std::string& s)
 {
@@ -157,4 +169,12 @@ int maxzero(int n) {
     return std::max(0, n);
 }
 
-
+template<typename Key, typename T>
+std::ostream& operator<<(std::ostream& stream, const std::map<Key,T>& m) {
+    stream << "{";
+    for (const auto &[k, v]: m) {
+        stream << k << " => " << v << ", ";
+    }
+    stream << "}";
+    return stream;
+}

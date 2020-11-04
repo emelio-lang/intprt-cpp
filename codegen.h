@@ -33,24 +33,15 @@ public:
     void operator () (const shared_ptr<Code> c);
 };
 
-class set_fv {
-private:
-    stack<shared_ptr<Code>> varstack;
-public:
-    set_fv(stack<shared_ptr<Code>> *pa = nullptr) {
-        if (pa) varstack = *pa;
-    }
-    ~set_fv() {
-    }
-    void operator () (const shared_ptr<Code> c);
-};
-
 class set_type {
 private:
     map<string, TypeSignature> bind;
     static map<string, TypeSignature> data_bind;
+    static set<string> special_values;
     map<string, shared_ptr<Lambda>> type_constructors;
     stack<shared_ptr<Code>> argstack;
+    TypeSignature excepted;
+    
 public:
     set_type(map<string, TypeSignature> *pb = nullptr, stack<shared_ptr<Code>> *pa = nullptr) {
         if (pa) argstack = *pa;
@@ -252,6 +243,8 @@ class pseudo_map {
 public:
     T& operator[](const Key& x);
     bool contains(const Key& k) const;
+    deque<Key> &get_keys() { return keys; }
+    size_t size() const { return keys.size(); }
 private:
     deque<Key> keys;
     deque<T> vals;
@@ -282,11 +275,17 @@ private:
     stack<shared_ptr<Code>> argstack;
     stack<shared_ptr<Code>> dummy_argstack;
     static map<string, TypeSignature> data_bind; // TODO: スコープいいの？
+    static pseudo_map<deque<TypeSignature>, string> type_constrs; // コンストラクタのオーバーロードが出来ないので名前を保存しておく
+    static map<string, vector<string>> spvals;
     // fuseは特別な名前で実体が作られるので元の名前からその名前への写像
     static map<string, string> fuse_bind;
     
     // TODO hashを作ってunordered_map<TypeSignature, string>に作った型情報を保存して使い回すようにする
     static pseudo_map<TypeSignature, string> tmptypes;
+    // 多相型について、実際に定義しなければならないデータ構造のリスト
+    pseudo_map<TypeSignature, string> defined_polymos;
+    // 多相型の単純なリスト
+    map<string, deque<string>> polymos;
     // deque<TypeSignature> tmptypes;
     // deque<string> tmptypes_name;
     
@@ -299,15 +298,25 @@ public:
     ~codegen7() {}
     Compiled operator () (const shared_ptr<Code> &c);
     Compiled fuse(const shared_ptr<Code> &c);
+    Compiled define(string name, const shared_ptr<Code>& code);
+    Compiled print_constructor(string type_name, const TypeSignature& newtype, int rtti=-1);
+    Compiled type_def(const string newtype_name, const TypeSignature &newtype);
     string print_def(string name, const shared_ptr<Code>& code);
-    tuple<string,string,string> print_data_structure(const TypeSignature type);
+    Compiled print_decl(std::string, const TypeSignature&);
+    tuple<string,string,string> print_data_structure(const TypeSignature type, string type_name="", const map<string,TypeSignature> &params={});
     string print_type_from(const deque<TypeSignature> &tys, const shared_ptr<Lambda> &lam);
-    string c_type_name(string s);
+    string print_polymos();
+    string c_type_name(string s, bool bPrefix = true);
+    string typesig_to_typename(const TypeSignature &type);
+    string typesig_to_constructor(const TypeSignature &type);
     string new_tmptype(const TypeSignature type);
     string new_dummy_var();
     void paircat(tuple<string,string,string> &x, const tuple<string,string,string> &&y);
+    int spval_to_int(SpecialValue sp);
+    bool is_spval(string a);
     // v.main <+ v.env
     string compress(const Compiled &&v);
+    string compress(const Compiled &v);
     // a += b
     void paircat(Compiled &a, const Compiled &&b);
     void paircat(Compiled &a, const Compiled &b);

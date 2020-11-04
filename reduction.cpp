@@ -12,14 +12,14 @@
 
 int ReductionCounter = 0;
 
-{! BUILTIN_1 <> name <> shared_ptr<Lambda> #name_p = std::make_shared<Lambda>(Lambda { {"a1"}, {} }); Code c_#name {#name_p, Literal {"#name"}, vector<shared_ptr<Code>> {}, TknvalsRegion {}}; !}
-{! BUILTIN_2 <> name <> shared_ptr<Lambda> #name_p = std::make_shared<Lambda>(Lambda { {"a1", "a2"}, {} }); Code c_#name {#name_p, Literal {"#name"}, vector<shared_ptr<Code>> {}, TknvalsRegion {}}; !}
+{! BUILTIN_1 <> name <> shared_ptr<Lambda> #name_p = std::make_shared<Lambda>(Lambda { {"a1"}, {} }); Code c_#name {#name_p, Literal {"#name"}, deque<shared_ptr<Code>> {}, TknvalsRegion {}}; !}
+{! BUILTIN_2 <> name <> shared_ptr<Lambda> #name_p = std::make_shared<Lambda>(Lambda { {"a1", "a2"}, {} }); Code c_#name {#name_p, Literal {"#name"}, deque<shared_ptr<Code>> {}, TknvalsRegion {}}; !}
 
 {- BUILTIN_1 <> negate -}
 {- BUILTIN_2 <> add -}
 {- BUILTIN_2 <> concat -}
 
-enum NotationType { LEFT, RIGHT };
+enum NotationType { LEFT, RIGHT, TYPE };
 
 struct ReductionFlow {
     map<string, shared_ptr<Code>> bind = {
@@ -139,6 +139,21 @@ bool apply_all_notations(shared_ptr<Code> &code,
                 case LEFT:
                     reapply = apply_notation(code, n->first);
                     break;
+                case TYPE:
+                    if (code->l) {
+                        for (auto &e : code->l->cArgtypes) {
+                            reapply = apply_notation(e, n->first);
+                            auto tmp = e->plain_string();
+                            cout << join(tmp) << endl;
+                        }
+                    }
+                    if (code->cRawtype) {
+                        cout << "hewwo " << *code->cRawtype->l->body;
+                        reapply = apply_notation(code->cRawtype->l->body, n->first);
+                        auto tmp = code->cRawtype->plain_string();
+                        cout << join(tmp) << endl;
+                    }
+                    break;
             }
             n++;
         }
@@ -254,7 +269,7 @@ continue_reduction_loop:
                     
                     // copy(res.args.begin(), res.args.begin(), back_inserter(code->args)); //?
 
-                } else if (code->lit.val == "notation" || code->lit.val == "gnotation") {
+                } else if (code->lit.val == "notation" || code->lit.val == "gnotation" || code->lit.val == "totation") {
                     // 表記の書き換え
                     // 書き換え規則を取得して、第三引数のコードをソース情報から書き換える。
                     // 再度パースしてできたCodeのreductionを今回の結果とする
@@ -285,6 +300,8 @@ continue_reduction_loop:
                         rf.notations.push_back(make_pair(Notation {conf, to_code}, LEFT));
                     } else if (code->lit.val == "gnotation") {
                         rf.notations.push_back(make_pair(Notation {conf, to_code}, RIGHT));
+                    } else if (code->lit.val == "totation") {
+                        rf.notations.push_back(make_pair(Notation {conf, to_code}, TYPE));
                     }
 
                     // DEBUG
@@ -445,7 +462,7 @@ ReductionFlow extract_all_notations(shared_ptr<Code> &code, ReductionFlow rf) {
 //                *given_p = *code;
             return rf;
         } else {
-            if (code->lit.val == "notation" || code->lit.val == "gnotation") {
+            if (code->lit.val == "notation" || code->lit.val == "gnotation" || code->lit.val == "totation") {
                 // 表記の書き換え
                 // 書き換え規則を取得して、第三引数のコードをソース情報から書き換える。
                 // 再度パースしてできたCodeのreductionを今回の結果とする
@@ -477,6 +494,8 @@ ReductionFlow extract_all_notations(shared_ptr<Code> &code, ReductionFlow rf) {
                     rf.notations.push_back(make_pair(Notation {conf, to_code}, LEFT));
                 } else if (code->lit.val == "gnotation") {
                     rf.notations.push_back(make_pair(Notation {conf, to_code}, RIGHT));
+                } else if (code->lit.val == "totation") {
+                    rf.notations.push_back(make_pair(Notation {conf, to_code}, TYPE));
                 }
 
                 cout << "There now notations like: \n";
@@ -523,7 +542,7 @@ ReductionFlow extract_all_notations(shared_ptr<Code> &code, ReductionFlow rf) {
 }
 
 
-void extract_all_notations(shared_ptr<Code> code, bool silent) {
+void extract_all_notations(shared_ptr<Code> &code, bool silent) {
     auto back = cout.rdbuf();
     if (silent) {
         cout.rdbuf(NULL);
@@ -537,3 +556,32 @@ void extract_all_notations(shared_ptr<Code> code, bool silent) {
     }
 }
 
+void reparse_types(shared_ptr<Code> &code, Tokenizer &tkn) {
+    if (code->cRawtype) {
+        reparse_types(code->cRawtype, tkn);
+        
+        tkn.clear();
+        tkn.tokenize("("+join(code->cRawtype->plain_string())+")");
+        cout << *code->cRawtype << endl;
+        cout << join(code->cRawtype->plain_string()) << endl;
+        ParserFlow pf = {tkn.tokenvals, 0};
+        code->rawtype = type_signature(pf);
+    }
+    if (code->l) {
+        for (auto e : code->l->cArgtypes) {
+            reparse_types(e, tkn);
+
+            cout << *e << endl;
+            cout << join(e->plain_string()) << endl;
+
+            tkn.clear();
+            tkn.tokenize("("+join(e->plain_string())+")");
+            ParserFlow pf = {tkn.tokenvals, 0};
+            code->l->argtypes.emplace_back(type_signature(pf));
+            cout << to_string(code->l->argtypes.back()) << endl;
+        }
+        if (code->l->body) reparse_types(code->l->body, tkn);
+    }
+    
+    for (auto e : code->args) reparse_types(e, tkn);
+}

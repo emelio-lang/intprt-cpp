@@ -14,6 +14,7 @@
 #include <sstream>
 
 map<string, TypeSignature> set_type::data_bind;
+set<string> set_type::special_values;
 
 const set<string> builtin_functions = {
     "add", "sub", "mul", "div", "negate", "concat", "fuse"
@@ -148,18 +149,6 @@ void SCOUT(deque<shared_ptr<T>> s) {
     cout << endl;
 }
 
-void set_fv::operator () (const shared_ptr<Code> c) {
-    // if (c->l) {
-    //     set_fv()(c->l->body);
-    //     c->l->freevars = c->l->body->l ? c->l->body->l->freevars
-    //     for (auto arg : c->args) {
-    //         c->l->
-    //     }
-    // } else {
-    // }
-}
-
-
 void set_arity::operator () (const shared_ptr<Code> c) {
     if (c->l) {
         c->arity += c->l->argnames.size();
@@ -244,18 +233,22 @@ void set_type::operator () (const shared_ptr<Code> c) {
 
         // 2
         for (int i = c->args.size()-1; i >= 0; i--) {
+            excepted = c->l->argtypes[i];
             (set_type(&bind))(c->args[i]);
             // argstack.push(c->args[i]);
         }
+        excepted = shared_ptr<TypeNull>();
 
         // 2 合致することを確かめます
         for (int i = 0; i < min(c->args.size(),c->l->argnames.size()); i++) {
             auto argname = c->l->argnames[i];
             TypeSignature a = normalized(bind[argname]);
             TypeSignature b = normalized(c->args[i]->type);
-            ASSERT(verify(a, b),
+            cout << argname << " 型検査" << endl;
+            ASSERT(verify(a, b, data_bind),
                    ("引数"+argname+"の型が合致しません. (expected:" + to_string(a) +
                     " inferred:"+to_string(b)+")"));
+            deep_copy_from(c->args[i]->type, bind[argname]);
         }
 
         // 4
@@ -272,9 +265,9 @@ void set_type::operator () (const shared_ptr<Code> c) {
     }
     else if (c->lit.val == "_get") {
         (set_type(&bind))(c->args[0]);
-        auto type_name = PURE(string)(c->args[0]->type);
-        if (MATCHS(TypeProduct)(data_bind[type_name])) {
-            auto &records = PURES(TypeProduct)(data_bind[type_name]);
+        TypeSignature from = MATCH(string)(c->args[0]->type) ? data_bind[PURE(string)(c->args[0]->type)] : c->args[0]->type;
+        if (MATCHS(TypeProduct)(from)) {
+            auto &records = PURES(TypeProduct)(from);
             string varname = "";
             {
                 auto &pivot = c->args[1];
@@ -299,9 +292,10 @@ void set_type::operator () (const shared_ptr<Code> c) {
     else if (c->lit.val == "fuse") {
         c->type = shared_ptr<TypeSum>(new TypeSum);
 
-        for (int i = c->args.size()-1; i >= 0; i--) {
+//        for (int i = c->args.size()-1; i >= 0; i--) { 下のやつも
+        for (int i = 0; i < c->args.size(); i++) {
             (set_type(&bind))(c->args[i]);
-            // argstack.push(c->args[i]);
+            // argstack.push(c->args[i]);　上のやつも
             PURES(TypeSum)(c->type)->add_type(c->args[i]->type);
         }
 
@@ -313,29 +307,26 @@ void set_type::operator () (const shared_ptr<Code> c) {
     else if (c->lit.val == "type") {
         shared_ptr<TypeFn> new_type_fn = shared_ptr<TypeFn>(new TypeFn);
         new_type_fn->to = c->args[0]->lit.val;
-        for (auto typ : PURES(TypeProduct)(c->args[1]->rawtype)->products) {
-            new_type_fn->from.emplace_back(typ);
+        // TODO: 積型しか対応してない....
+        if (MATCHS(TypeProduct)(c->args[1]->rawtype)) {
+            for (auto typ : PURES(TypeProduct)(c->args[1]->rawtype)->products) {
+                new_type_fn->from.emplace_back(typ);
+            }
+            bind[c->args[0]->lit.val] = new_type_fn;
+        } else {
+            if (MATCHS(TypeSum)(c->args[1]->rawtype)) {
+                for (auto e : PURES(TypeSum)(c->args[1]->rawtype)->sums)
+                    if (MATCH(SpecialValue)(e))
+                        special_values.insert(PURE(SpecialValue)(e).val);
+            }
+            new_type_fn->from.emplace_back(c->args[1]->rawtype);
+            bind[c->args[0]->lit.val] = new_type_fn;
+            normalize(bind[c->args[0]->lit.val]);
         }
-        bind[c->args[0]->lit.val] = new_type_fn;
         data_bind[c->args[0]->lit.val] = c->args[1]->rawtype;
         cout << c->args[0]->lit.val << " " << to_string(bind[c->args[0]->lit.val]) << endl;
 
-        // tmp.normalize();
-        // int i = 0;
-        // for (auto typ : c->args[1]->l->argtypes) {
-        //     // NOTE: c->args[1]->lへの参照を使用しています！！
-        //     tmp.from.push_back(make_shared<TypeSignature>(typ));
-
-        //     TypeSignature memfn;
-        //     memfn.from.push_back(tmp.to);
-        //     memfn.to = typ.to;
-        //     memfn.normalize();
-        //     bind[c->args[1]->l->argnames[i]] = memfn;
-        //     i++;
-        // }
-        
-//        type_constructors[c->args[0]->lit.val] = c->args[1]->l;
-        this->operator()(c->args[2]);
+        this->operator()(c->args.back());
     } else if (builtin_functions.contains(c->lit.val)) {
         for (auto a : c->args) (set_type(&bind))(a);
 
@@ -347,7 +338,7 @@ void set_type::operator () (const shared_ptr<Code> c) {
             cout << to_string(arg(bf2typesig.at(c->lit.val),i)) << endl;
             TypeSignature x = normalized(arg(bf2typesig.at(c->lit.val),i));
             TypeSignature y = normalized(c->args[i]->type);
-            ASSERT(verify(x, y),
+            ASSERT(verify(x, y, data_bind),
                    "'"+c->lit.val+"'の"+to_string(i)+"番目の引数の型が合致しません. (expected:" + to_string(bf2typesig.at(c->lit.val)) +
                    " inferred:"+to_string(c->args[i]->type)+")");
         }
@@ -356,18 +347,31 @@ void set_type::operator () (const shared_ptr<Code> c) {
             c->type = "int";
         }
     } else {
-        const auto fnname = c->lit.val;
+        auto fnname = c->lit.val;
         for (auto a : c->args) (set_type(&bind))(a);
 
         // もし、関数の型が分かっていないならとりまエラー
-        ASSERT(bind.contains(fnname), "'"+fnname+"' の型が不明です");
+        if (c->cRawtype) {
+            fnname = to_string(c->rawtype);
+            if (MATCHS(Parametered)(c->rawtype))
+                fnname = PURES(Parametered)(c->rawtype)->type;
+            ASSERT(bind.contains(fnname), "コンストラクタ '"+to_string(c->rawtype)+"' は定義されていません");
+        } else if (special_values.contains(fnname)) { // 特殊値
+            ASSERT(c->args.size() == 0, "特殊値？ '"+fnname+"' に適用することは出来ません");
+            c->type = SpecialValue{fnname};
+            return;
+        } else {
+            cout << special_values.contains(fnname);
+            ASSERT(bind.contains(fnname), "'"+fnname+"' の型が不明です");
+        }
 
         deep_copy_from(c->type, bind[fnname]);
+        cout << fnname << " " << to_string(c->type) << endl;
         apply(c->type, (int) c->args.size());
 
         int i = 0;
         for (auto a : c->args) {
-            ASSERT(verify(normalized(arg(bind[fnname],i)), normalized(c->args[i]->type)),
+            ASSERT(verify(normalized(arg(bind[fnname],i)), normalized(c->args[i]->type), data_bind),
                    "'"+c->lit.val+"'の"+to_string(i)+"番目の引数の型が合致しません. (expected:" + to_string(bind[fnname]) +
                    " inferred:"+to_string(c->args[i]->type)+")");
         }

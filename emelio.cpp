@@ -67,9 +67,13 @@ int main(int argc, char **argv) {
 
         shared_ptr<Code> root = code(pf);
         // set_type()(root);
-        // cout << *root << endl;
+        // cout << *root << endl; フル時計
         
         extract_all_notations(root, true);
+        {
+            Tokenizer tmptkn = tkn;
+            reparse_types(root, tmptkn);
+        }
         cout << "pang";
         cout << *root << endl;
         rename_variables(root);
@@ -81,7 +85,9 @@ int main(int argc, char **argv) {
         cout << 'a' << endl;
 //        cout << transpile(root, "c");
         Compiled result;
-        result = codegen7()(root);
+        codegen7 codegen;
+        result = codegen(root);
+        result.global += codegen.print_polymos();
 
 //        cout << "prepare name hash:\n";
 //        Compiled result;

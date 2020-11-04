@@ -46,17 +46,24 @@ string get_eventual_fnname(shared_ptr<Code> c) {
 vector<string> Code::plain_string() {
     vector<string> res = {};
 
-    if (this->lit.val != "") res.push_back(this->lit.val);
-
-    for (auto a : this->args) {
-        vector<string> const tmp = a->plain_string();
-        res.reserve(res.size() + distance(tmp.begin(),tmp.end()));
-        res.insert(res.end(),tmp.begin(),tmp.end());
+    if (this->lit.val != "") {
+        res.push_back(this->lit.val);
+    } else if (this->cRawtype) {
+        res.push_back(":(" + join(this->cRawtype->plain_string()) + ")");
     }
 
     if (this->l) {
         vector<string> const tmp = this->l->body->plain_string();
         res.reserve(res.size() + distance(tmp.begin(),tmp.end()));
+        if (this->args.size() != 0) res.emplace_back("(");
+        res.insert(res.end(),tmp.begin(),tmp.end());
+        if (this->args.size() != 0) res.emplace_back(")");
+    }
+
+    for (auto a : this->args) {
+        vector<string> const tmp = a->plain_string();
+        res.reserve(res.size() + distance(tmp.begin(),tmp.end()));
+        res.emplace_back(" ");
         res.insert(res.end(),tmp.begin(),tmp.end());
     }
 
@@ -133,7 +140,7 @@ ostream& operator<<(ostream& stream, const Code& c) {
     } else if (c.lit.val != "") {
         stream << "(λ " << c.lit << ")";
     } else if (c.is_type()) {
-        stream << "#" << to_string(c.rawtype) << endl;
+        stream << "#" << to_string(c.rawtype);
     }
     
     stream << "[";

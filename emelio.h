@@ -51,6 +51,7 @@
 struct ParserFlow {
     vector<string> &tknvals;
     int idx;
+    map<string, deque<string>> polymos;
 };
 struct Code;
 struct Literal;
@@ -65,10 +66,14 @@ struct Lambda;
 // // typedef deque<Type> AndType;
 // // typedef deque<Type> OrType;
 // typedef variant<string, shared_ptr<TypeSignature>/*, AndType, OrType*/> Type;
-struct TypeProduct; struct TypeSum; struct TypeFn; struct TypeNull { int dummy; /*なんかvariantは空の型無理な奴らしいから*/ };
-typedef variant<shared_ptr<TypeNull>,string,shared_ptr<TypeSum>,shared_ptr<TypeProduct>,shared_ptr<TypeFn>> TypeSignature;
+struct SpecialValue; struct Parametered; struct TypeProduct; struct TypeSum; struct TypeFn; struct TypeNull { int dummy; /*なんかvariantは空の型無理な奴らしいから*/ };
+struct SpecialValue {
+    string val;
+};
+typedef variant<shared_ptr<TypeNull>,string,SpecialValue,shared_ptr<Parametered>,shared_ptr<TypeSum>,shared_ptr<TypeProduct>,shared_ptr<TypeFn>> TypeSignature;
 struct TypeSum {
     deque<TypeSignature> sums;
+    // TODO: いまはこれだけ特別扱いする感じで実装してるけど、TypeSignatureにあたらしくTypeSpecialみたいなの導入して、sumsにまとめてしまったほうが見通しが良いかも（normalizeの処理とか）
     void add_type(TypeSignature ts) {
         if (find(sums.begin(), sums.end(), ts) == sums.end()) {
             sums.emplace_back(ts);
@@ -83,8 +88,13 @@ struct TypeFn {
     deque<TypeSignature> from;
     TypeSignature to;
 };
-bool equal(const TypeSignature &ts1, const TypeSignature &ts2);
-bool verify(const TypeSignature &ts1, const TypeSignature &ts2);
+struct Parametered {
+    string type;
+    deque<TypeSignature> params;
+};
+bool equal(const TypeSignature &ts1, const TypeSignature &ts2, const map<string,TypeSignature> &bind = {}, int lvl = 0);
+bool verify(const TypeSignature &ts1, const TypeSignature &ts2, const map<string,TypeSignature> &bind = {}, int lvl = 0);
+//bool verify(const TypeSignature &ts1, const TypeSignature &ts2, const map<string,TypeSignature> &bind = {});
 bool is_functional(const TypeSignature &ts1);
 bool arity(const TypeSignature &ts);
 bool operator==(const TypeSignature &ts1, const TypeSignature &ts2);
@@ -140,12 +150,14 @@ struct Code {
     // NOTE: tknvalsは変更されないことを想定しています
     TknvalsRegion src;
 
-    TypeSignature rawtype;
+    TypeSignature rawtype; // Codeとして型注釈が書いてある場合 :Type
     TypeSignature type;
 
 
     int arity = 0;
 
+    shared_ptr<Code> cRawtype;
+    
     void deep_copy_from(const Code& other);
     vector<string> plain_string();
     bool is_type() const;
@@ -162,6 +174,7 @@ struct Lambda {
     vector<int> argarities {};
     vector<ArgQuality> argqualities {};
     vector<TypeSignature> argtypes {};
+    vector<shared_ptr<Code>> cArgtypes {};
 
     TypeSignature type;
 
@@ -182,16 +195,12 @@ struct CodegenFlow {
     map<string, shared_ptr<Code>> bind;
 };
 
-
-
-
-
-
-
 unique_ptr<Code> code(ParserFlow& p);
 //pair<ProgramData,int> parse(ARG(vector<string>) tknvals, int initial_idx = 0, string basename = "");
+TypeSignature type_signature(ParserFlow& p);
 void reduction(shared_ptr<Code> code, bool silent = false);
-void extract_all_notations(shared_ptr<Code> c, bool silent = false);
+void extract_all_notations(shared_ptr<Code> &c, bool silent = false);
+void reparse_types(shared_ptr<Code> &code, Tokenizer &tkn);
 
 bool is_computed(const shared_ptr<Code> &c);
 std::string get_eventual_fnname( shared_ptr<Code>  );

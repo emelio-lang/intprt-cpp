@@ -49,6 +49,23 @@ fuseは関数の定義域を合わせる。
 |              |
 +--------------+
 
+<Notation>
+マクロ. codeに適用するnotationと、type signatureに適用するtotation(type notation)がある.
+まずはnotationについて。
+notationはCodeとして与えられるソースに対して、書換を行う。
+入力はラムダ式の形で書かれているので、全体が条件にマッチするならば書換を行えばよい。
+条件の書き方が問題になる。
+例えば、足し算ならば
+A + Bs -> add A Bs
+でも良いし、
+As + B -> add As B
+でも良い。
+単項演算子なら、
+- A -> negate A
+とする。これは
+create -2 3 
+のように使いたいので、
+
 
 <Type system>
 型の書き方は基本的に、関数の引数の名前に:（コロン）をつけてその後に型を書く感じ。
@@ -60,6 +77,24 @@ notationは型用のnotationを用意してそれだけ適用するようにす�
 data Alpha = A Int
 で定義されたAlphaと、Intは違う。
 これのメリットは何だろうか。
+
+
+validな型注釈もいろいろある.
+:List
+:(A B C)
+:(A (B|C))
+:((A-B->B) C)
+※:(first:A second:(A->A))
+:List<A B>
+:List<A List<A>>
+
+これに独自記法をいれる（もちろんカオスになる）
+:[A] で :List<A> を表すとすれば
+:[A [A]]
+
+[ , A [ A ] ]
+
+もvalidになる.
 
 
 

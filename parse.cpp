@@ -35,13 +35,16 @@
     return l;
 }
 
+{- PARSE <> unique_ptr<Code> <> argument -}
+;
+
 
 TypeSignature named_ts(ParserFlow& p);
 TypeSignature type_signature(ParserFlow& p);
 
 {- PARSE <> TypeSignature <> named_ts -}
 {
-    TypeSignature typesig =  make_shared<TypeProduct>(TypeProduct {});
+    TypeSignature typesig = make_shared<TypeProduct>(TypeProduct {});
     while (true) {
         PURES(TypeProduct)(typesig)->names.emplace_back(NOW);
         p.idx++;
@@ -58,16 +61,16 @@ TypeSignature type_signature(ParserFlow& p);
 // TODO: 関数分けてみても良いかも
 // TypeSignature 種類
 // And = Ty Ty Ty ...
-// Or  = Ty | Ty | Ty ...
+// Or  = Ty | Ty | *Ty ...
 // Fn  = Ty - Ty - Ty -> Ty
 // Ty  = ( Ty )
 // Ty  = name1:Ty name2:Ty ...
-// Ty  = String [ Ty ... ]
+// Ty  = String < Ty ... >
 // Ty  = String
 {- PARSE <> TypeSignature <> type_signature -}
 {
     TypeSignature typesig;
-    enum { PRODUCT, SUM, FUNCTION, ATOM, PATOM } type;
+    enum { PRODUCT, SUM, FUNCTION, ATOM, PATOM, PARAM } type;
 
     if (NEXT == ":") {
         TypeSignature tmp;
@@ -78,6 +81,11 @@ TypeSignature type_signature(ParserFlow& p);
     if (NOW == "(") {
         type = PATOM;
         p.idx++;
+    } else if (NOW == "*") {
+        p.idx++;
+        typesig = SpecialValue{NOW};
+        p.idx++;
+        return typesig;
     } else {
         typesig = NOW;
         p.idx++;
@@ -102,6 +110,11 @@ TypeSignature type_signature(ParserFlow& p);
             type = FUNCTION;
             typesig = make_shared<TypeFn>(TypeFn { {tmp} });
             p.idx++;
+        } else if (NOW == "<") {
+            type = PARAM;
+            assert(MATCH(string)(tmp));
+            typesig = make_shared<Parametered>(Parametered { PURE(string)(tmp), {} });
+            p.idx++;
         } else {
             type = PRODUCT;
             typesig = make_shared<TypeProduct>(TypeProduct { {tmp} });
@@ -116,11 +129,21 @@ TypeSignature type_signature(ParserFlow& p);
             type_fn_to = true;
             p.idx++;
         }
+        // bool special_value = false;
+        // if (type==SUM && NOW=="*") { // 特殊値
+        //     special_value = true;
+        //     {- SKIP <> "*" -}
+        // }
         
         {- MONAD <> tmp <> TypeSignature <> type_signature -}
         switch (type) {
             case SUM:
-                 PURES(TypeSum)(typesig)->add_type(tmp);
+                // if (special_value) {
+                //     ASSERT(MATCH(string)(tmp), "特殊値なら文字列を指定してください " + to_string(tmp));
+                //     PURES(TypeSum)(typesig)->add_type(SpecialValue {tmp});
+                // } else {
+                    PURES(TypeSum)(typesig)->add_type(tmp);
+                // }
                 break;
             case PRODUCT: PURES(TypeProduct)(typesig)->products.push_back(tmp);break;
             case FUNCTION:
@@ -130,6 +153,13 @@ TypeSignature type_signature(ParserFlow& p);
                     return typesig;
                 } else {
                     PURES(TypeFn)(typesig)->from.push_back(tmp);
+                }
+                break;
+            case PARAM:
+                PURES(Parametered)(typesig)->params.emplace_back(tmp);
+                if (NOW == ">") {
+                    {- SKIP <> ">" -}
+                    return typesig;
                 }
                 break;
         }
@@ -173,9 +203,13 @@ TypeSignature type_signature(ParserFlow& p);
                 if (NEXT == ":") {
                     p.idx++;
                     {- SKIP <> ":" -}
-                    TypeSignature tmp;
-                    {- MONAD <> tmp <> TypeSignature <> type_signature -}
-                    l->argtypes.push_back(tmp);
+                    // TypeSignature tmp;
+                    // {- MONAD <> tmp <> TypeSignature <> type_signature -}
+                    // l->argtypes.emplace_back(tmp);
+                    shared_ptr<Code> tmp;
+                    {- MONAD <> tmp <> shared_ptr<Code> <> argument -}
+                    l->cArgtypes.push_back(tmp);
+                    
                 } else {
                     p.idx++;
                 }
@@ -238,7 +272,12 @@ TypeSignature type_signature(ParserFlow& p);
 
 //    {- SKIP <> "(" -}
     if (NOW != ")") {
-        if (NOW == "(") {
+        if (NOW == ":") {
+            {- SKIP <> ":" -}
+            // 式のはじめに（適用する関数の位置に）型注釈がある場合（つまり、コンストラクタ）
+            // NOTE: tnotationで記法を変更されている場合もあるので、ここはcodeとしてパースしておいて、reparse_types@reduction.cppでtnotationを適用しながらパースし直す
+            {- MONAD <> c->cRawtype <> shared_ptr<code> <> argument -}
+        } else if (NOW == "(") {
             {- MONAD <> c->l <> shared_ptr<Lambda> <> lambda -}
         } else {
             {- MONAD <> c->lit <> Literal <> literal -}
@@ -248,14 +287,19 @@ TypeSignature type_signature(ParserFlow& p);
             if (NOW == ")" || NOW == "") {
                 break;
             }
-            // TODO: Codeの最初に型表記がある場合は...
+
+            // NOTE: (↑と同様) tnotationで記法を変更されている場合もあるので、ここはcodeとしてパースしておいて、reparse_types@reduction.cppでtnotationを適用しながらパースし直す
             if (NOW == ":") {
                 {- SKIP <> ":" -}
                 
-                TypeSignature tmp;
                 shared_ptr<Code> newcode = shared_ptr<Code>(new Code);
-                {- MONAD <> tmp <> TypeSignature <> type_signature -}
-                newcode->rawtype = tmp;
+                // TypeSignature tmp;
+                // {- MONAD <> tmp <> TypeSignature <> type_signature -}
+                shared_ptr<Code> tmp;
+                {- MONAD <> tmp <> Code <> argument -}
+//                newcode->rawtype = tmp;
+//                c->args.emplace_back(newcode);
+                newcode->cRawtype = tmp;
                 c->args.emplace_back(newcode);
                 continue;
             }
